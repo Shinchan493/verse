@@ -5,6 +5,7 @@ const sequelize =
   env.NODE_ENV === 'test' || env.NODE_ENV === 'development'
     ? new Sequelize(env.DATABASE, env.USER, env.PASSWORD, {
         host: env.DB_HOST,
+        port: Number(env.DB_PORT),
         dialect: 'postgres',
         logging: false,
       })

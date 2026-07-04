@@ -3,7 +3,12 @@ import transporter from '../config/smtp.config';
 
 class MailService {
   public sendMail = async (mailOptions: Mail.Options) => {
-    transporter.sendMail(mailOptions);
+    // Never let a mail failure crash the server (fire-and-forget in callers).
+    try {
+      await transporter.sendMail(mailOptions);
+    } catch (err) {
+      console.error('[mail] sendMail failed:', (err as Error).message);
+    }
   };
 }
 const mailService = new MailService();
