@@ -1,11 +1,5 @@
-import { useEffect, useState } from 'react';
-import {
-  Tldraw,
-  createTLStore,
-  defaultShapeUtils,
-  TLRecord,
-  TLStoreWithStatus,
-} from 'tldraw';
+import { useCallback } from 'react';
+import { Tldraw, Editor, TLRecord } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as Y from 'yjs';
 import { Socket } from 'socket.io-client';
@@ -16,86 +10,82 @@ interface WhiteboardProps {
 }
 
 /**
- * A tldraw canvas whose store is mirrored into a Yjs Y.Map and relayed over the
- * room socket, so every participant draws on the same board in real time.
+ * A tldraw canvas shared over the room. We let tldraw create and own its store
+ * (so all base records exist) and wire the Yjs sync in onMount:
+ *   - local document edits are pushed to a Yjs Y.Map (relayed to the room)
+ *   - remote Yjs changes are applied granularly back into the store
+ * Only document-scoped records (shapes/pages) are shared; per-user UI state
+ * (camera, selection) stays local.
  */
 const Whiteboard = ({ socket }: WhiteboardProps) => {
-  const [storeWithStatus, setStoreWithStatus] = useState<TLStoreWithStatus>({
-    status: 'loading',
-  });
+  const handleMount = useCallback(
+    (editor: Editor) => {
+      const store = editor.store;
+      const ydoc = new Y.Doc();
+      const yStore = ydoc.getMap<TLRecord>('tldraw');
 
-  useEffect(() => {
-    const ydoc = new Y.Doc();
-    const yStore = ydoc.getMap<TLRecord>('tldraw');
-    const store = createTLStore({ shapeUtils: defaultShapeUtils });
+      const unbind = bindYDocToRoom(socket, 'whiteboard', ydoc);
 
-    const unbind = bindYDocToRoom(socket, 'whiteboard', ydoc);
+      // Local edits -> Yjs.
+      const unlisten = store.listen(
+        (entry) => {
+          const { added, updated, removed } = entry.changes;
+          ydoc.transact(() => {
+            Object.values(added).forEach((r) => yStore.set(r.id, r));
+            Object.values(updated).forEach(([, r]) => yStore.set(r.id, r));
+            Object.values(removed).forEach((r) => yStore.delete(r.id));
+          });
+        },
+        { source: 'user', scope: 'document' }
+      );
 
-    // Local tldraw edits -> Yjs.
-    const unlisten = store.listen(
-      (entry) => {
-        const { added, updated, removed } = entry.changes;
-        ydoc.transact(() => {
-          Object.values(added).forEach((record) =>
-            yStore.set(record.id, record)
-          );
-          Object.values(updated).forEach(([, record]) =>
-            yStore.set(record.id, record)
-          );
-          Object.values(removed).forEach((record) => yStore.delete(record.id));
+      // Remote Yjs changes -> store (apply only the keys that changed).
+      const observer = (events: Y.YEvent<any>[], txn: Y.Transaction) => {
+        if (txn.local) return;
+        store.mergeRemoteChanges(() => {
+          events.forEach((event) => {
+            event.changes.keys.forEach((change, id) => {
+              if (change.action === 'delete') {
+                store.remove([id as any]);
+              } else {
+                const record = yStore.get(id);
+                if (record) store.put([record]);
+              }
+            });
+          });
         });
-      },
-      { source: 'user', scope: 'document' }
-    );
+      };
+      yStore.observeDeep(observer);
 
-    // Remote Yjs changes -> tldraw store.
-    const observer = (_events: Y.YEvent<any>[], transaction: Y.Transaction) => {
-      if (transaction.local) return;
-      const records = Array.from(yStore.values());
-      store.mergeRemoteChanges(() => {
-        const incomingIds = new Set(records.map((r) => r.id));
-        const toRemove = store
-          .allRecords()
-          .map((r) => r.id)
-          .filter((id) => !incomingIds.has(id));
-        if (toRemove.length) store.remove(toRemove as any);
-        if (records.length) store.put(records);
-      });
-    };
-    yStore.observeDeep(observer);
+      // Initial reconciliation.
+      if (yStore.size > 0) {
+        // Load an existing board from a participant who is already here.
+        store.mergeRemoteChanges(() => {
+          store.put(Array.from(yStore.values()));
+        });
+      } else {
+        // Seed the shared doc with our document-scoped records.
+        const docRecords = store.serialize('document');
+        ydoc.transact(() => {
+          Object.entries(docRecords).forEach(([id, record]) =>
+            yStore.set(id, record as TLRecord)
+          );
+        });
+      }
 
-    // Apply any state already present (e.g. arriving from the server sync).
-    if (yStore.size > 0) {
-      store.mergeRemoteChanges(() => {
-        store.put(Array.from(yStore.values()));
-      });
-    }
-
-    setStoreWithStatus({
-      status: 'synced-remote',
-      connectionStatus: 'online',
-      store,
-    });
-
-    return () => {
-      unlisten();
-      yStore.unobserveDeep(observer);
-      unbind();
-      ydoc.destroy();
-    };
-  }, [socket]);
-
-  if (storeWithStatus.status !== 'synced-remote') {
-    return (
-      <div className="h-full grid place-items-center text-ink-faint text-sm bg-paper">
-        Loading whiteboard…
-      </div>
-    );
-  }
+      return () => {
+        unlisten();
+        yStore.unobserveDeep(observer);
+        unbind();
+        ydoc.destroy();
+      };
+    },
+    [socket]
+  );
 
   return (
     <div className="h-full w-full">
-      <Tldraw store={storeWithStatus.store} />
+      <Tldraw onMount={handleMount} />
     </div>
   );
 };
