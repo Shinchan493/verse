@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef } from 'react';
+import { useContext, useEffect, useRef, useState } from 'react';
 import * as Y from 'yjs';
 import {
   Awareness,
@@ -60,6 +60,7 @@ const DocumentEditor = () => {
   const { accessToken, email } = useAuth();
   const wrapperRef = useRef<HTMLDivElement | null>(null);
   const documentId = doc?.id;
+  const [wordCount, setWordCount] = useState(0);
 
   useEffect(() => {
     if (wrapperRef.current === null || documentId == null || !accessToken) {
@@ -87,6 +88,14 @@ const DocumentEditor = () => {
     quill.root.style.minHeight = '1000px';
 
     const binding = new QuillBinding(ytext, quill, awareness);
+
+    // Live word count / reading time.
+    const updateWordCount = () => {
+      const text = quill.getText().trim();
+      setWordCount(text.length === 0 ? 0 : text.split(/\s+/).length);
+    };
+    updateWordCount();
+    quill.on('text-change', updateWordCount);
 
     const displayName = email ?? 'Anonymous';
     awareness.setLocalStateField('user', {
@@ -133,6 +142,7 @@ const DocumentEditor = () => {
     });
 
     return () => {
+      quill.off('text-change', updateWordCount);
       ydoc.off('update', docUpdateHandler);
       awareness.off('update', awarenessUpdateHandler);
       removeAwarenessStates(awareness, [ydoc.clientID], 'unmount');
@@ -146,12 +156,20 @@ const DocumentEditor = () => {
   }, [documentId, accessToken, email]);
 
   return (
-    <div
-      style={{ width: '850px' }}
-      className="bg-white shadow-md flex-shrink-0 min-h-[1100px]"
-    >
-      <div ref={wrapperRef} />
-    </div>
+    <>
+      <div
+        style={{ width: '850px' }}
+        className="bg-white shadow-md flex-shrink-0 min-h-[1100px]"
+      >
+        <div ref={wrapperRef} />
+      </div>
+      {wordCount > 0 && (
+        <div className="fixed bottom-5 right-5 z-20 bg-ink text-paper text-xs font-medium px-3.5 py-2 rounded-full shadow-lg">
+          {wordCount} {wordCount === 1 ? 'word' : 'words'} ·{' '}
+          {Math.max(1, Math.ceil(wordCount / 200))} min read
+        </div>
+      )}
+    </>
   );
 };
 

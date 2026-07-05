@@ -18,13 +18,20 @@ const DocumentMenuButton = ({
   const [loading, setLoading] = useState(false);
   const dropdownRef = useRef(null);
   const [showDropdown, setShowDropdown] = useState(false);
+  const [confirming, setConfirming] = useState(false);
   const { error } = useContext(ToastContext);
+
+  const toggleDropdown = () => {
+    setConfirming(false);
+    setShowDropdown((prev) => !prev);
+  };
 
   const handleMenuBtnBlur = (event: FocusEvent<HTMLButtonElement>) => {
     const classList = (event.target as HTMLButtonElement).classList;
 
     if (!classList.contains('document-menu')) {
       setShowDropdown(false);
+      setConfirming(false);
     }
   };
 
@@ -50,7 +57,7 @@ const DocumentMenuButton = ({
       className={`relative flex justify-center document-menu-btn-${documentId}`}
     >
       <button
-        onClick={() => setShowDropdown(!showDropdown)}
+        onClick={toggleDropdown}
         onBlur={handleMenuBtnBlur}
         className={`text-ink-faint hover:text-ink hover:bg-paper-2 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors document-menu-btn-${documentId}`}
       >
@@ -79,14 +86,40 @@ const DocumentMenuButton = ({
         children={
           <div
             ref={dropdownRef}
-            className="absolute top-full right-0 mt-1 z-10 w-44 bg-white py-1.5 rounded-lg shadow-lg border border-paper-2 document-menu"
+            className="absolute top-full right-0 mt-1 z-10 w-52 bg-white py-1.5 rounded-lg shadow-lg border border-paper-2 document-menu"
           >
-            <div
-              onClick={() => (!loading ? handleDeleteBtnClick() : () => {})}
-              className="w-full text-red-600 hover:bg-paper text-sm px-4 py-2 text-left cursor-pointer document-menu"
-            >
-              Delete
-            </div>
+            {!confirming ? (
+              <div
+                onClick={() => setConfirming(true)}
+                className="w-full text-red-600 hover:bg-paper text-sm px-4 py-2 text-left cursor-pointer document-menu"
+              >
+                Delete
+              </div>
+            ) : (
+              <div className="px-4 py-2 document-menu">
+                <p className="text-sm text-ink document-menu">
+                  Delete this document?
+                </p>
+                <p className="text-xs text-ink-faint mt-0.5 document-menu">
+                  This can’t be undone.
+                </p>
+                <div className="flex items-center gap-2 mt-2.5 document-menu">
+                  <button
+                    onClick={() => (!loading ? handleDeleteBtnClick() : null)}
+                    disabled={loading}
+                    className="text-xs font-semibold text-paper bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-md document-menu"
+                  >
+                    {loading ? 'Deleting…' : 'Delete'}
+                  </button>
+                  <button
+                    onClick={() => setConfirming(false)}
+                    className="text-xs font-semibold text-ink-soft hover:text-ink px-2 py-1.5 document-menu"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         }
       />
