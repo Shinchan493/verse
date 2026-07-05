@@ -22,9 +22,9 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    # --include=dev: NODE_ENV=production would otherwise skip devDeps, but the
-    # build needs typescript/@types to compile.
-    buildCommand: npm install --include=dev && npm run build
+    # typescript + build-required @types live in dependencies, and the test
+    # folder is excluded from the build, so a plain production install compiles.
+    buildCommand: npm install && npm run build
     startCommand: node dist/src/server.js
     envVars:
       - key: NODE_ENV
