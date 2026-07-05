@@ -8,6 +8,7 @@ import app from './app';
 import documentService from './services/document.service';
 import SocketEvent from './types/enums/socket-events-enum';
 import { getYDoc, applyUpdate, encodeState } from './collab/yjs-collab';
+import { registerRoomNamespace } from './collab/rooms';
 
 const server = http.createServer(app);
 
@@ -17,6 +18,9 @@ const io = new Server(server, {
     methods: '*',
   },
 });
+
+// Verse Live — real-time coding rooms (code + whiteboard + WebRTC signaling).
+registerRoomNamespace(io);
 
 server.listen(env.PORT, () => {
   console.log(`Server listening on port ${env.PORT}...`);

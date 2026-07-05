@@ -6,6 +6,7 @@ import useDocuments from '../../hooks/use-documents';
 import useAuth from '../../hooks/use-auth';
 import DocumentsList from '../../components/molecules/documents-list';
 import CreateDocumentButton from '../../components/atoms/create-document-button';
+import LiveSessionHero from '../../components/molecules/live-session-hero';
 import DocumentInterface from '../../types/interfaces/document';
 
 const matchesQuery = (document: DocumentInterface, query: string) => {
@@ -45,15 +46,21 @@ const Create = () => {
       <DocumentCreateHeader query={query} setQuery={setQuery} />
 
       <main className="max-w-4xl mx-auto px-6 py-10 sm:py-14">
+        {!isSearching && (
+          <div className="mb-12">
+            <LiveSessionHero />
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h1 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight">
+            <h1 className="font-serif text-2xl sm:text-3xl font-semibold tracking-tight">
               {isSearching ? 'Search results' : 'Your documents'}
             </h1>
             <p className="mt-1 text-ink-soft">
               {isSearching
                 ? `Showing documents matching “${query.trim()}”`
-                : 'Pick up where you left off, or start something new.'}
+                : 'Or write solo — your documents live here.'}
             </p>
           </div>
           <CreateDocumentButton />
