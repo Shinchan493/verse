@@ -43,6 +43,12 @@ const Landing = () => {
       <header className="max-w-6xl mx-auto px-6 py-5 flex items-center justify-between">
         <Wordmark to="/" size="md" />
         <nav className="flex items-center gap-3 sm:gap-5">
+          <a
+            href="#live"
+            className="hidden sm:inline text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+          >
+            Live sessions
+          </a>
           <Link
             to="/login"
             className="text-sm font-medium text-ink-soft hover:text-ink transition-colors"
@@ -119,6 +125,112 @@ const Landing = () => {
               Keep typing. Nothing to save, nothing to sync — it just stays in
               step.
             </p>
+          </div>
+        </div>
+      </section>
+
+      {/* Live Sessions — the USP */}
+      <section id="live" className="border-t border-paper-2 bg-paper">
+        <div className="max-w-6xl mx-auto px-6 py-20 sm:py-24 grid md:grid-cols-2 gap-12 lg:gap-16 items-center">
+          <div>
+            <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-accent bg-accent-tint border border-accent-soft rounded-full px-3 py-1">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent opacity-60" />
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-accent" />
+              </span>
+              Live Sessions
+            </span>
+            <h2 className="mt-6 font-serif text-4xl sm:text-5xl font-semibold tracking-tight leading-[1.05]">
+              Not just docs —
+              <br />
+              code together, live.
+            </h2>
+            <p className="mt-5 text-lg text-ink-soft leading-relaxed max-w-md">
+              Spin up a room to pair-program, run an interview, or teach — a
+              shared code editor, a collaborative whiteboard, and built-in video,
+              all in one place.
+            </p>
+            <ul className="mt-7 space-y-3">
+              {[
+                'Real-time code editor with shared cursors',
+                'A whiteboard to sketch and explain',
+                'Video & audio built in — no extra tools',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3">
+                  <span className="grid place-items-center w-5 h-5 rounded-full bg-accent-tint text-accent flex-shrink-0">
+                    <svg
+                      className="w-3 h-3"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="3"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M5 13l4 4L19 7"
+                      />
+                    </svg>
+                  </span>
+                  <span className="text-ink-soft">{item}</span>
+                </li>
+              ))}
+            </ul>
+            <Link
+              to={startHref}
+              className="inline-block mt-8 font-semibold text-paper bg-accent hover:bg-accent-hover px-7 py-3.5 rounded-full transition-colors shadow-sm"
+            >
+              Start a live session
+            </Link>
+          </div>
+
+          {/* Dark room preview */}
+          <div className="rounded-2xl border border-ink/10 bg-[#141414] shadow-[0_28px_80px_-28px_rgba(26,26,26,0.55)] overflow-hidden">
+            <div className="flex items-center gap-2 px-4 py-3 border-b border-white/10">
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+              </span>
+              <span className="font-serif text-sm font-semibold text-white">
+                Live Session
+              </span>
+              <div className="ml-auto flex -space-x-2">
+                <span className="w-6 h-6 rounded-full bg-accent text-white text-[11px] font-semibold grid place-items-center ring-2 ring-[#141414]">
+                  A
+                </span>
+                <span className="w-6 h-6 rounded-full bg-blue-500 text-white text-[11px] font-semibold grid place-items-center ring-2 ring-[#141414]">
+                  M
+                </span>
+              </div>
+            </div>
+            <div className="flex h-60">
+              <div className="flex-1 border-r border-white/10 p-4 space-y-2.5 bg-[#131316]">
+                <div className="h-2 w-2/5 rounded bg-accent/60" />
+                <div className="h-2 w-3/5 rounded bg-white/15" />
+                <div className="h-2 w-1/2 rounded bg-white/15" />
+                <div className="h-2 w-2/3 rounded bg-blue-400/40" />
+                <div className="h-2 w-1/3 rounded bg-white/15" />
+                <div className="h-2 w-3/5 rounded bg-white/10" />
+                <div className="h-2 w-2/5 rounded bg-white/10" />
+              </div>
+              <div className="flex-1 p-4 grid place-items-center bg-[#101011]">
+                <svg
+                  viewBox="0 0 80 60"
+                  className="w-28 h-20 text-white/25"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2.5"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    d="M8 46c10-18 18-24 26-24s10 14 22 2"
+                  />
+                  <circle cx="60" cy="18" r="4" />
+                  <path strokeLinecap="round" d="M44 50h28" />
+                </svg>
+              </div>
+            </div>
           </div>
         </div>
       </section>

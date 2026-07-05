@@ -58,13 +58,31 @@ const CollabCodeEditor = ({ socket, me }: CollabCodeEditorProps) => {
         langCompartmentRef.current.of(LANGUAGES[language]()),
         oneDark,
         yCollab(ytext, awareness),
-        EditorView.theme({
-          '&': { height: '100%', fontSize: '14px' },
-          '.cm-scroller': {
-            fontFamily:
-              "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+        // Override oneDark's blue-grey with a near-black to match the room.
+        EditorView.theme(
+          {
+            '&': {
+              height: '100%',
+              fontSize: '14px',
+              backgroundColor: '#131316',
+            },
+            '.cm-gutters': {
+              backgroundColor: '#131316',
+              borderRight: '1px solid rgba(255,255,255,0.06)',
+              color: 'rgba(255,255,255,0.25)',
+            },
+            '.cm-activeLine': { backgroundColor: 'rgba(255,255,255,0.03)' },
+            '.cm-activeLineGutter': {
+              backgroundColor: 'rgba(255,255,255,0.05)',
+            },
+            '.cm-scroller': {
+              fontFamily:
+                "'JetBrains Mono', 'Fira Code', ui-monospace, monospace",
+            },
+            '&.cm-focused': { outline: 'none' },
           },
-        }),
+          { dark: true }
+        ),
       ],
     });
 
@@ -89,15 +107,15 @@ const CollabCodeEditor = ({ socket, me }: CollabCodeEditorProps) => {
   };
 
   return (
-    <div className="flex flex-col h-full bg-[#282c34]">
-      <div className="flex items-center justify-between px-3 py-2 border-b border-white/10 bg-[#21252b] flex-shrink-0">
-        <span className="text-xs font-medium text-white/50 uppercase tracking-wide">
+    <div className="flex flex-col h-full bg-[#131316]">
+      <div className="flex items-center justify-between px-4 py-2 border-b border-white/10 bg-[#0f0f0f] flex-shrink-0">
+        <span className="text-xs font-semibold text-white/50 uppercase tracking-wide">
           Code
         </span>
         <select
           value={language}
           onChange={(e) => handleLanguageChange(e.target.value)}
-          className="text-xs bg-[#2c313a] text-white/80 border border-white/10 rounded px-2 py-1 focus:outline-none"
+          className="text-xs bg-[#1c1c1f] text-white/80 border border-white/10 rounded-md px-2 py-1 focus:outline-none"
         >
           {Object.keys(LANGUAGES).map((lang) => (
             <option key={lang} value={lang}>

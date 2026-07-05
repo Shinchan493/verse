@@ -176,7 +176,7 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
   return (
     <div className="flex items-center gap-2">
       {error ? (
-        <span className="text-xs text-ink-faint px-3 py-6">{error}</span>
+        <span className="text-xs text-white/40 px-3 py-6">{error}</span>
       ) : (
         <>
           {localStream && (
@@ -191,7 +191,7 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
               title="Toggle microphone"
               className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
                 micOn
-                  ? 'bg-paper hover:bg-paper-2 text-ink border border-paper-2'
+                  ? 'bg-white/10 hover:bg-white/20 text-white'
                   : 'bg-red-600 text-white'
               }`}
             >
@@ -202,7 +202,7 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
               title="Toggle camera"
               className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
                 camOn
-                  ? 'bg-paper hover:bg-paper-2 text-ink border border-paper-2'
+                  ? 'bg-white/10 hover:bg-white/20 text-white'
                   : 'bg-red-600 text-white'
               }`}
             >

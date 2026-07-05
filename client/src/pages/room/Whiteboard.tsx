@@ -20,6 +20,9 @@ interface WhiteboardProps {
 const Whiteboard = ({ socket }: WhiteboardProps) => {
   const handleMount = useCallback(
     (editor: Editor) => {
+      // Match the dark code editor.
+      editor.user.updateUserPreferences({ colorScheme: 'dark' });
+
       const store = editor.store;
       const ydoc = new Y.Doc();
       const yStore = ydoc.getMap<TLRecord>('tldraw');

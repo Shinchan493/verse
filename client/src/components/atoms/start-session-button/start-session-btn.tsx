@@ -1,7 +1,13 @@
 import { VideoCameraIcon } from '@heroicons/react/outline';
 import { useNavigate } from 'react-router-dom';
 
-const StartSessionButton = () => {
+interface StartSessionButtonProps {
+  variant?: 'primary' | 'outline';
+}
+
+const StartSessionButton = ({
+  variant = 'primary',
+}: StartSessionButtonProps) => {
   const navigate = useNavigate();
 
   const startSession = () => {
@@ -9,13 +15,18 @@ const StartSessionButton = () => {
     navigate(`/room/${id}`);
   };
 
+  const styles =
+    variant === 'primary'
+      ? 'bg-accent text-paper hover:bg-accent-hover shadow-sm'
+      : 'border border-paper-2 text-ink hover:border-accent-soft hover:text-accent';
+
   return (
     <button
       onClick={startSession}
-      className="inline-flex flex-shrink-0 items-center gap-2 border border-paper-2 text-ink text-sm font-semibold px-4 py-2.5 rounded-full hover:border-accent-soft hover:text-accent transition-colors"
+      className={`inline-flex flex-shrink-0 items-center gap-2 text-sm font-semibold px-5 py-2.5 rounded-full transition-colors ${styles}`}
     >
       <VideoCameraIcon className="w-4 h-4" />
-      <span>Live session</span>
+      <span>Start a live session</span>
     </button>
   );
 };
