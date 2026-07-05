@@ -7,6 +7,7 @@ import env from './config/env.config';
 import app from './app';
 import documentService from './services/document.service';
 import SocketEvent from './types/enums/socket-events-enum';
+import { getYDoc, applyUpdate, encodeState } from './collab/yjs-collab';
 
 const server = http.createServer(app);
 
@@ -49,10 +50,26 @@ io.on('connection', (socket) => {
                 );
               });
 
-            socket.on(SocketEvent.SEND_CHANGES, (rawDraftContentState) => {
+            // --- Yjs (CRDT) collaboration ---
+            // Send the joining peer the authoritative document state, then
+            // relay their binary updates to everyone else in the room. Yjs
+            // merges concurrent edits on each client, so there is no more
+            // whole-document last-write-wins clobbering.
+            const ydoc = await getYDoc(documentId);
+            socket.emit(SocketEvent.YJS_SYNC, encodeState(ydoc));
+
+            socket.on(SocketEvent.YJS_UPDATE, (update: ArrayBuffer) => {
+              const bytes = new Uint8Array(update);
+              applyUpdate(documentId, bytes);
+              socket.broadcast.to(documentId).emit(SocketEvent.YJS_UPDATE, bytes);
+            });
+
+            // Awareness (live cursors / selections) is presence-only, so it is
+            // relayed peer-to-peer without touching the persisted doc.
+            socket.on(SocketEvent.YJS_AWARENESS, (update: ArrayBuffer) => {
               socket.broadcast
                 .to(documentId)
-                .emit(SocketEvent.RECEIVE_CHANGES, rawDraftContentState);
+                .emit(SocketEvent.YJS_AWARENESS, new Uint8Array(update));
             });
 
             socket.on('disconnect', async () => {

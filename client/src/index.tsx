@@ -16,7 +16,6 @@ import { DocumentProvider } from './contexts/document-context';
 import Register from './pages/register';
 import VerifyEmail from './pages/user/verify-email';
 import ResetPassword from './pages/user/reset-password';
-import { EditorProvider } from './contexts/editor-context';
 
 ReactDOM.render(
   <React.StrictMode>
@@ -30,9 +29,7 @@ ReactDOM.render(
                 <AuthRoute
                   element={
                     <DocumentProvider>
-                      <EditorProvider>
-                        <Document />
-                      </EditorProvider>
+                      <Document />
                     </DocumentProvider>
                   }
                 />
