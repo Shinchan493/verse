@@ -1,110 +1,140 @@
-## Google Docs Clone
+# Verse
 
-Built with React, Typescript, TailwindCSS, ExpressJS, Postgres, and Socket.IO
-[Check it out here!](https://docs.noahgothacked.com)
+**An open-source workspace for real-time collaboration — shared documents, live coding rooms with video, and a whiteboard, all in one place.**
 
-### API Documentation
+Verse lets teams create together in the same moment: write documents with live cursors, or spin up a **Live Session** to pair-program, run an interview, or teach — a shared code editor, a collaborative whiteboard, and built-in video.
 
-[View it here!](https://documenter.getpostman.com/view/12120504/UVyoWHgt)
-
-## Project Screen Shot(s)
-
-- Full Register/Login/Verify Email functionality, with helpful toast notifications to guide you.
-
-
-  ![Authentication](client/screenshots/authentication.png)
-
-- Basic document dashboard to create new documents, and navigate to your recent or shared documents.
-
-
-  ![Dashboard](client/screenshots/home.png)
-
-- Real time collaboration. Work on documents at the same time with those you've shared the document with.
-
-
-  ![Collaboration](client/screenshots/collaboration.png)
-
-## Installation and Setup Instructions
-
-Clone down this repository. You will need node and npm installed globally on your machine.
-
-Client Installation:
-
-`cd client`
-
-Install Dependencies:
-
-`npm install`
-
-To Start Server:
-
-`npm start`
-
-To Visit App:
-
-`localhost:3000`
-
-Server Installation:
-
-`cd server`
-
-Create the .env file in the root directory:
-
-`touch .env.development`
-
-You will need to add all of the neccessary environment variables [listed in this file](server/src/config/env.config.ts)
-
-Install Dependencies:
-
-`npm install`
-
-To Start Server:
-
-`npm start`
-
-To Visit App:
-
-`localhost:3001`
-
-## Reflection
-
-This was a week long project I used to learn web sockets, and sharpen my React skills. While the project still has a ton of functionality that could be added, I accomplished my goals of the project. I used Socket.IO to create and consume web sockets, to provide real-time collaboration between your peers, similar to Google Docs. I learned a lot about React particularly on how to structure and consume Contexts and Hooks.
-
-If I wanted to work more on this project, the next thing I would do is refactor my client service files. I am using the React Context API to provide a global AuthContext which stores my JWT accessToken in memory. However, my service files are plain typescript files, and cannot make use of the Context API. This makes it tedious to provide the accessToken to these services, as I have to pass the token as an argument each time. My first thoughts on how to fix this would be to create custom Hooks for each service, let me know if you can think of a better way!
-
-Overall, I had a lot of fun working on this project. It was nice to not have to worry about designing a front end (and just copying Google's hard work). I am looking forward to trying more 'clone' projects in the future!
+> Verse began as a fork of [noahskorner/google-docs-clone](https://github.com/noahskorner/google-docs-clone) and has since been substantially reworked — the collaboration engine, the Live Session feature, and the whole product design are new. Credit to the original author for the starting point.
 
 ---
 
-## Attribution & fork notes
+## Features
 
-This is a fork/rework of the original project by **[noahskorner/google-docs-clone](https://github.com/noahskorner/google-docs-clone)**. All original authorship and git history are preserved. The original repository does not declare a license; this copy is maintained for personal learning and portfolio purposes with credit to the original author.
+### 📄 Documents
+- Real-time collaborative rich-text editing (Quill) with **live cursors and presence**
+- **Conflict-free** merging via CRDT — no overwrites, no "reload to sync"
+- Share by email or link, with per-document access
+- Word count / reading time, autosave
 
-### Changes in this fork (local-dev + robustness)
+### 🟢 Live Sessions
+- Join-by-link rooms for pair programming, interviews, and teaching
+- **Collaborative code editor** (CodeMirror 6) with language selection, shared cursors, and starter templates
+- **Collaborative whiteboard** (tldraw) to sketch and explain
+- **Peer-to-peer video & audio** (WebRTC) with mic/cam controls
+- **Dark / light** session theme, participant list, session timer
 
-- `server/src/config/db.config.ts` — dev DB config now honors `DB_PORT` (was hardcoded to the default port).
-- `server/src/config/smtp.config.ts` — SMTP port and TLS are now env-driven (`SMTP_PORT`, `SMTP_SECURE`), so local dev can use a plaintext mail catcher while production stays on 465/TLS.
-- `server/src/services/mail.service.ts` — `sendMail` now catches and logs errors so an SMTP failure no longer crashes the server via an unhandled rejection.
+### 🔧 Under the hood
+- Real-time layer built on **Yjs** relayed over authenticated **Socket.IO**
+- Self-hostable — your data, your server
 
-### Local dev quick start
+---
 
-Backend needs Postgres and an SMTP endpoint. Easiest with Docker:
+## Tech stack
+
+**Frontend** — React 18 · TypeScript · Tailwind CSS · Quill + `y-quill` (docs) · CodeMirror 6 + `y-codemirror.next` (code) · tldraw (whiteboard) · `simple-peer` (WebRTC) · Yjs · Socket.IO client
+
+**Backend** — Node · Express · TypeScript · Socket.IO · Yjs · Sequelize · PostgreSQL · JWT auth (access + refresh) · Nodemailer
+
+---
+
+## Getting started (local)
+
+### Prerequisites
+- Node.js 18+
+- Docker (for Postgres + a local mail catcher)
+
+### 1. Start Postgres and a mail catcher
 
 ```bash
-docker run -d --name gdocs-pg -e POSTGRES_USER=gdocs -e POSTGRES_PASSWORD=gdocs -e POSTGRES_DB=googledocs -p 5433:5432 postgres:16
-docker run -d --name gdocs-mail -p 1025:1025 -p 1080:1080 maildev/maildev
+docker run -d --name verse-pg \
+  -e POSTGRES_USER=verse -e POSTGRES_PASSWORD=verse -e POSTGRES_DB=verse \
+  -p 5433:5432 postgres:16
+
+docker run -d --name verse-mail -p 1025:1025 -p 1080:1080 maildev/maildev
 ```
 
-Create `server/.env.development` (see the variables in `server/src/config/env.config.ts`; point `DB_PORT=5433`, `SMTP_HOST=localhost`, `SMTP_PORT=1025`, `SMTP_SECURE=false`). Then:
+### 2. Backend
 
 ```bash
-cd server && npm install && npm run build && npm start   # http://localhost:3001
-cd client && npm install && npm start                    # http://localhost:3000
+cd server
+npm install
 ```
 
-Registration sends a verification email — read it at the maildev UI (http://localhost:1080) and click the link.
+Create `server/.env.development` (see all required keys in `server/src/config/env.config.ts`):
 
-### Roadmap (rework)
+```env
+NODE_ENV=development
+HOST=localhost
+PORT=3001
 
-- Replace the naive whole-document Socket.IO broadcast with **Yjs/CRDT** for true conflict-free concurrent editing and live cursors.
-- Add AI assist (summarize / rewrite), granular sharing permissions, and export to PDF/DOCX.
+DATABASE_URL=postgres://verse:verse@localhost:5433/verse
+USER=verse
+PASSWORD=verse
+DB_HOST=localhost
+DB_PORT=5433
+DATABASE=verse
+
+# Local mail catcher (read messages at http://localhost:1080)
+SMTP_HOST=localhost
+SMTP_PORT=1025
+SMTP_SECURE=false
+SMTP_USER=dev
+SMTP_PASSWORD=dev
+
+ACCESS_TOKEN_SECRET=change_me
+ACCESS_TOKEN_EXPIRATION=15m
+REFRESH_TOKEN_SECRET=change_me
+REFRESH_TOKEN_EXPIRATION=7d
+VERIFY_EMAIL_SECRET=change_me
+PASSWORD_RESET_SECRET=change_me
+PASSWORD_RESET_EXPIRATION=1h
+
+FRONT_END_URL=http://localhost:3000
+
+# Optional: skip email verification (users are verified on signup)
+AUTO_VERIFY_USERS=true
+```
+
+Build and run (tables auto-create on first boot):
+
+```bash
+npm run build
+npm start           # http://localhost:3001
+```
+
+### 3. Frontend
+
+```bash
+cd client
+npm install
+npm start           # http://localhost:3000
+```
+
+Open **http://localhost:3000**, register, and start writing — or hit **Start a live session**.
+
+---
+
+## Architecture
+
+- **Documents** and **Live Sessions** both use **Yjs** (CRDT) for state, relayed as binary updates over **Socket.IO**. The server keeps an authoritative doc per document/room and persists documents to Postgres.
+- **Live Sessions** run over a dedicated `/room` Socket.IO namespace that relays multiple Yjs docs (code + whiteboard), presence, and **WebRTC signaling** for peer-to-peer video.
+- Auth is JWT-based (short-lived access token + refresh token); rooms are authenticated with the same token.
+
+> Note: the real-time doc/room state is held in memory, so the backend currently runs as a **single instance**. Horizontal scaling would use a shared provider (e.g. Hocuspocus + Redis).
+
+---
+
+## Deployment
+
+The repo includes a `render.yaml` blueprint (Postgres + Node API + static frontend). The frontend needs `REACT_APP_API_URL` set to the API URL (with a trailing slash); the API needs `FRONT_END_URL` set to the frontend origin (for CORS). WebRTC video requires HTTPS, which hosts like Render provide.
+
+---
+
+## Credits
+
+- Original project: [noahskorner/google-docs-clone](https://github.com/noahskorner/google-docs-clone)
+- Built on the excellent open-source work of Yjs, Quill, CodeMirror, tldraw, and Socket.IO.
+
+## License
+
+See [LICENSE](LICENSE) if present. If you plan to reuse this project, please keep the attribution above.
