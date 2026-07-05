@@ -2,8 +2,7 @@ import { Link } from 'react-router-dom';
 import Wordmark from '../../components/atoms/wordmark';
 import useAuth from '../../hooks/use-auth';
 
-// Update this to your public repo when you open-source it.
-const GITHUB_URL = 'https://github.com/anishmehta24/collab-docs';
+const GITHUB_URL = 'https://github.com/anishmehta24/verse';
 
 const GitHubIcon = ({ className }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
