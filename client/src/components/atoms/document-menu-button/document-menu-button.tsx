@@ -52,7 +52,7 @@ const DocumentMenuButton = ({
       <button
         onClick={() => setShowDropdown(!showDropdown)}
         onBlur={handleMenuBtnBlur}
-        className={`hover:bg-gray-100 relative left-2 w-8 h-8 rounded-full flex items-center justify-center document-menu-btn-${documentId}`}
+        className={`text-ink-faint hover:text-ink hover:bg-paper-2 flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors document-menu-btn-${documentId}`}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -79,11 +79,11 @@ const DocumentMenuButton = ({
         children={
           <div
             ref={dropdownRef}
-            className="absolute top-full mt-1 z-10 w-52 bg-white py-2 rounded-sm shadow-lg border document-menu"
+            className="absolute top-full right-0 mt-1 z-10 w-44 bg-white py-1.5 rounded-lg shadow-lg border border-paper-2 document-menu"
           >
             <div
               onClick={() => (!loading ? handleDeleteBtnClick() : () => {})}
-              className="w-full text-black hover:bg-gray-100 text-sm px-6 py-1 text-left document-menu"
+              className="w-full text-red-600 hover:bg-paper text-sm px-4 py-2 text-left cursor-pointer document-menu"
             >
               Delete
             </div>

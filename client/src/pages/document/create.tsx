@@ -26,23 +26,41 @@ const Create = () => {
       className="bg-paper text-ink font-sans overflow-y-auto"
     >
       <DocumentCreateHeader />
-      <CreateDocumentButton />
-      {loading ? (
-        <Spinner size="lg" />
-      ) : (
-        <>
-          <DocumentsList
-            title="Recent Documents"
-            documents={recentDocuments}
-            setDocuments={setDocuments}
-          />
-          <DocumentsList
-            title="Shared Documents"
-            documents={sharedDocuments}
-            setDocuments={setDocuments}
-          />
-        </>
-      )}
+
+      <main className="max-w-4xl mx-auto px-6 py-10 sm:py-14">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h1 className="font-serif text-3xl sm:text-4xl font-semibold tracking-tight">
+              Your documents
+            </h1>
+            <p className="mt-1 text-ink-soft">
+              Pick up where you left off, or start something new.
+            </p>
+          </div>
+          <CreateDocumentButton />
+        </div>
+
+        {loading ? (
+          <div className="flex justify-center py-24">
+            <Spinner size="lg" />
+          </div>
+        ) : (
+          <div className="mt-10 space-y-12">
+            <DocumentsList
+              title="Recent"
+              emptyLabel="You haven’t created any documents yet."
+              documents={recentDocuments}
+              setDocuments={setDocuments}
+            />
+            <DocumentsList
+              title="Shared with you"
+              emptyLabel="Nothing has been shared with you yet."
+              documents={sharedDocuments}
+              setDocuments={setDocuments}
+            />
+          </div>
+        )}
+      </main>
     </div>
   );
 };
