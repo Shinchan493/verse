@@ -1,24 +1,27 @@
 // The individual DB vars (USER/PASSWORD/DB_HOST/DB_PORT/DATABASE) are only used
 // by the local dev/test Sequelize config; production connects via DATABASE_URL,
 // so they are not required there (see db.config.ts).
-if (
-  process.env.NODE_ENV === undefined ||
-  process.env.HOST === undefined ||
-  process.env.PORT === undefined ||
-  process.env.DATABASE_URL === undefined ||
-  process.env.SMTP_HOST === undefined ||
-  process.env.SMTP_USER === undefined ||
-  process.env.SMTP_PASSWORD === undefined ||
-  process.env.ACCESS_TOKEN_SECRET === undefined ||
-  process.env.ACCESS_TOKEN_EXPIRATION === undefined ||
-  process.env.REFRESH_TOKEN_SECRET === undefined ||
-  process.env.REFRESH_TOKEN_EXPIRATION === undefined ||
-  process.env.VERIFY_EMAIL_SECRET === undefined ||
-  process.env.PASSWORD_RESET_SECRET === undefined ||
-  process.env.PASSWORD_RESET_EXPIRATION === undefined ||
-  process.env.FRONT_END_URL === undefined
-) {
-  throw new Error('Environment variables missing.');
+const REQUIRED_ENV = [
+  'NODE_ENV',
+  'HOST',
+  'PORT',
+  'DATABASE_URL',
+  'SMTP_HOST',
+  'SMTP_USER',
+  'SMTP_PASSWORD',
+  'ACCESS_TOKEN_SECRET',
+  'ACCESS_TOKEN_EXPIRATION',
+  'REFRESH_TOKEN_SECRET',
+  'REFRESH_TOKEN_EXPIRATION',
+  'VERIFY_EMAIL_SECRET',
+  'PASSWORD_RESET_SECRET',
+  'PASSWORD_RESET_EXPIRATION',
+  'FRONT_END_URL',
+];
+
+const missingEnv = REQUIRED_ENV.filter((key) => process.env[key] === undefined);
+if (missingEnv.length > 0) {
+  throw new Error(`Environment variables missing: ${missingEnv.join(', ')}`);
 }
 
 const env = {
