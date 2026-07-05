@@ -1,4 +1,4 @@
-import { useCallback } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { Tldraw, Editor, TLRecord } from 'tldraw';
 import 'tldraw/tldraw.css';
 import * as Y from 'yjs';
@@ -7,6 +7,7 @@ import { bindYDocToRoom } from './room-yjs';
 
 interface WhiteboardProps {
   socket: Socket;
+  theme: 'dark' | 'light';
 }
 
 /**
@@ -17,11 +18,20 @@ interface WhiteboardProps {
  * Only document-scoped records (shapes/pages) are shared; per-user UI state
  * (camera, selection) stays local.
  */
-const Whiteboard = ({ socket }: WhiteboardProps) => {
+const Whiteboard = ({ socket, theme }: WhiteboardProps) => {
+  const editorRef = useRef<Editor | null>(null);
+  const themeRef = useRef(theme);
+
+  // Live-switch tldraw's color scheme when the session theme changes.
+  useEffect(() => {
+    themeRef.current = theme;
+    editorRef.current?.user.updateUserPreferences({ colorScheme: theme });
+  }, [theme]);
+
   const handleMount = useCallback(
     (editor: Editor) => {
-      // Match the dark code editor.
-      editor.user.updateUserPreferences({ colorScheme: 'dark' });
+      editorRef.current = editor;
+      editor.user.updateUserPreferences({ colorScheme: themeRef.current });
 
       const store = editor.store;
       const ydoc = new Y.Doc();
