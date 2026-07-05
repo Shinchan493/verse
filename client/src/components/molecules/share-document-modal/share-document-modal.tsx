@@ -75,6 +75,7 @@ const ShareDocumentModal = () => {
     copyLinkInputRef.current.focus();
     copyLinkInputRef.current.select();
     window.document.execCommand('copy');
+    success('Link copied to clipboard.');
   };
 
   const handleOnKeyPress = async (event: KeyboardEvent) => {
@@ -100,43 +101,34 @@ const ShareDocumentModal = () => {
       document.users.filter((documentUser) => documentUser.user.email === email)
         .length > 0);
 
-  const restrictedAccessBtn = (
-    <div className="space-y-1">
-      <button
-        disabled={saving}
-        onClick={() => updateIsPublic(true)}
-        className="font-semibold text-blue-600 p-2 hover:bg-blue-50 rounded-md"
-      >
-        {saving && <Spinner size="sm" />}
-        <span className={`${saving && 'opacity-0'}`}>
-          Change to anyone with the link
-        </span>
-      </button>
-      <p className="mx-2">
-        <b className="font-semibold">Restricted</b>&nbsp;
-        <span className="text-gray-600">
-          Only people added can open with this link
-        </span>
-      </p>
-    </div>
-  );
+  const canShare =
+    email !== null && validator.isEmail(email) && !alreadyShared;
 
-  const publicAccessBtn = (
-    <div className="space-y-1">
+  const accessRow = (
+    <div className="flex items-center justify-between gap-3">
+      <div>
+        <p className="font-medium text-ink">
+          {document?.isPublic ? 'Anyone with the link' : 'Restricted'}
+        </p>
+        <p className="text-ink-faint text-xs mt-0.5">
+          {document?.isPublic
+            ? 'Anyone with this link can open the document'
+            : 'Only people you add can open this document'}
+        </p>
+      </div>
       <button
         disabled={saving}
-        onClick={() => updateIsPublic(false)}
-        className="font-semibold text-blue-600 p-2 hover:bg-blue-50 rounded-md"
+        onClick={() => updateIsPublic(!document?.isPublic)}
+        className="flex-shrink-0 text-sm font-semibold text-accent hover:bg-accent-tint px-3 py-1.5 rounded-lg transition-colors"
       >
-        {saving && <Spinner size="sm" />}
-        <span className={`${saving && 'opacity-0'}`}>
-          Change to only shared users
-        </span>
+        {saving ? (
+          <Spinner size="sm" />
+        ) : document?.isPublic ? (
+          'Make restricted'
+        ) : (
+          'Make public'
+        )}
       </button>
-      <p className="mx-2">
-        <b className="font-semibold">Public</b>&nbsp;
-        <span className="text-gray-600">Anyone with this link can view</span>
-      </p>
     </div>
   );
 
@@ -150,11 +142,7 @@ const ShareDocumentModal = () => {
             viewBox="0 0 20 20"
             fill="currentColor"
           >
-            <path
-              fillRule="evenodd"
-              d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z"
-              clipRule="evenodd"
-            />
+            <path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" />
           </svg>
           <span>Share</span>
         </button>
@@ -165,73 +153,81 @@ const ShareDocumentModal = () => {
         ) : (
           <div
             onKeyPress={(event) => handleOnKeyPress(event)}
-            className="space-y-4 text-sm"
+            className="bg-white rounded-2xl shadow-2xl border border-paper-2 overflow-hidden font-sans text-ink"
           >
-            <div className="rounded-md bg-white shadow-xl p-4 space-y-4">
-              <div className="flex items-center space-x-2 m-2">
-                <div className="w-8 h-8 bg-blue-500 flex justify-center items-center rounded-full text-white">
-                  <UserAddIcon className="w-5 h-5 relative" />
+            {/* Header */}
+            <div className="px-6 pt-6 pb-4">
+              <div className="flex items-center gap-3">
+                <span className="grid place-items-center w-10 h-10 rounded-xl bg-accent-tint text-accent flex-shrink-0">
+                  <UserAddIcon className="w-5 h-5" />
+                </span>
+                <div>
+                  <h1 className="font-serif text-xl font-semibold leading-tight">
+                    Share this document
+                  </h1>
+                  <p className="text-ink-faint text-xs">
+                    Invite people to edit with you in real time.
+                  </p>
                 </div>
-                <h1 className="text-xl font-medium">Share with people</h1>
               </div>
-              <input
-                type="text"
-                name=""
-                id=""
-                value={email !== null ? email : ''}
-                onChange={handleShareEmailInputChange}
-                placeholder="Enter email"
-                className="border-b border-blue-500 rounded-t-md p-4 w-full bg-gray-100  font-medium"
-              />
+
+              {/* Invite by email */}
+              <div className="mt-5 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={email !== null ? email : ''}
+                  onChange={handleShareEmailInputChange}
+                  placeholder="Add people by email"
+                  className="flex-1 h-11 px-4 rounded-lg bg-paper border border-paper-2 text-sm text-ink placeholder-ink-faint focus:outline-none focus:ring-2 focus:ring-accent-soft focus:border-accent-soft"
+                />
+                <button
+                  onClick={handleShareBtnClick}
+                  disabled={loading || !canShare}
+                  className={`${
+                    canShare ? 'btn-primary' : 'btn-disabled'
+                  } h-11 px-5`}
+                >
+                  {loading ? (
+                    <Spinner size="sm" />
+                  ) : (
+                    <span>Invite</span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            {/* People with access */}
+            <div className="px-6 pb-2">
+              <p className="text-xs font-semibold uppercase tracking-wide text-ink-faint mb-1">
+                People with access
+              </p>
               <SharedUsers
                 documentUsers={document.users}
                 setDocument={setDocument}
               />
-              <div className="w-full flex justify-end space-x-2">
-                <button
-                  onClick={handleShareBtnClick}
-                  disabled={
-                    loading ||
-                    email === null ||
-                    !validator.isEmail(email) ||
-                    alreadyShared
-                  }
-                  className={`${
-                    email === null || !validator.isEmail(email) || alreadyShared
-                      ? 'btn-disabled'
-                      : 'btn-primary'
-                  } px-6`}
-                >
-                  {loading && <Spinner size="sm" />}
-                  <span className={`${loading && 'opacity-0'}`}>Share</span>
-                </button>
-              </div>
             </div>
-            <div className="rounded-md bg-white shadow-xl p-4 space-y-4 flex flex-col">
-              <div className="m-2 flex items-center space-x-2">
-                <div className="w-8 h-8 bg-gray-400 flex justify-center items-center rounded-full text-white">
-                  <LinkIcon className="w-5 h-5 relative" />
-                </div>
-                <h1 className="text-xl font-medium">Get Link</h1>
+
+            {/* Link access */}
+            <div className="mt-2 px-6 py-5 border-t border-paper-2 bg-paper">
+              <div className="flex items-center gap-3 mb-3">
+                <span className="grid place-items-center w-8 h-8 rounded-lg bg-white border border-paper-2 text-ink-soft flex-shrink-0">
+                  <LinkIcon className="w-4 h-4" />
+                </span>
+                <p className="font-medium">General access</p>
               </div>
-              <div>
-                <div className="flex justify-between items-center">
-                  <div className="space-y-1">
-                    {document.isPublic ? publicAccessBtn : restrictedAccessBtn}
-                  </div>
-                  <input
-                    ref={copyLinkInputRef}
-                    type="text"
-                    className="d-none opacity-0 cursor-default"
-                  />
-                  <button
-                    onClick={handleCopyLinkBtnClick}
-                    className="font-semibold text-blue-600 p-2 hover:bg-blue-50 rounded-md"
-                  >
-                    Copy link
-                  </button>
-                </div>
-              </div>
+              {accessRow}
+              <input
+                ref={copyLinkInputRef}
+                type="text"
+                className="opacity-0 absolute pointer-events-none"
+                readOnly
+              />
+              <button
+                onClick={handleCopyLinkBtnClick}
+                className="mt-4 w-full h-10 rounded-lg border border-paper-2 bg-white text-sm font-semibold text-ink hover:border-accent-soft hover:text-accent transition-colors"
+              >
+                Copy link
+              </button>
             </div>
           </div>
         )

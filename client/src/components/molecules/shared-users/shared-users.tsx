@@ -49,31 +49,36 @@ const SharedUsers = ({ documentUsers, setDocument }: SharedUsersProps) => {
   };
 
   return (
-    <div>
-      <div className="px-2 py-4 w-full flex items-center justify-between hover:bg-gray-100 rounded-md">
-        <div className="flex items-center space-x-2">
+    <div className="max-h-56 overflow-y-auto">
+      <div className="px-2 py-2.5 w-full flex items-center justify-between hover:bg-paper rounded-lg">
+        <div className="flex items-center gap-3 min-w-0">
           <div
-            className={`${backgroundColor} w-8 h-8 flex justify-center items-center text-white uppercase rounded-full text-xl font-medium`}
+            className={`${backgroundColor} w-9 h-9 flex-shrink-0 flex justify-center items-center text-white uppercase rounded-full text-base font-semibold`}
           >
             {email !== null && email[0]}
           </div>
-          <p className="font-medium">{email !== null && email} (you)</p>
+          <p className="font-medium text-ink truncate">
+            {email !== null && email}{' '}
+            <span className="text-ink-faint font-normal">(you)</span>
+          </p>
         </div>
-        <p className="text-gray-500 italic">Owner</p>
+        <p className="text-ink-faint text-sm flex-shrink-0 pl-2">Owner</p>
       </div>
       {documentUsers.map((documentUser) => {
         return (
           <div
             key={documentUser.user.email}
-            className="px-2 py-4 w-full flex items-center justify-between hover:bg-gray-100 rounded-md"
+            className="group px-2 py-2.5 w-full flex items-center justify-between hover:bg-paper rounded-lg"
           >
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-3 min-w-0">
               <div
-                className={`${sharedUserBackgroundColor} w-8 h-8 flex justify-center items-center text-white uppercase rounded-full text-xl font-medium`}
+                className={`${sharedUserBackgroundColor} w-9 h-9 flex-shrink-0 flex justify-center items-center text-white uppercase rounded-full text-base font-semibold`}
               >
                 {documentUser.user.email[0]}
               </div>
-              <p className="font-medium">{documentUser.user.email}</p>
+              <p className="font-medium text-ink truncate">
+                {documentUser.user.email}
+              </p>
             </div>
             <button
               onClick={() =>
@@ -83,7 +88,7 @@ const SharedUsers = ({ documentUsers, setDocument }: SharedUsersProps) => {
                 })
               }
               disabled={loading}
-              className="font-semibold text-blue-600 p-2 hover:bg-blue-50 rounded-md"
+              className="flex-shrink-0 text-sm font-semibold text-ink-soft hover:text-red-600 px-2 py-1 rounded-md transition-colors"
             >
               Remove
             </button>
