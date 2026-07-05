@@ -1,0 +1,123 @@
+/**
+ * Live Session rooms (Verse Live).
+ *
+ * A Socket.IO namespace ("/room") that powers real-time coding rooms:
+ *   - relays Yjs updates for multiple in-room docs (e.g. "code", "whiteboard")
+ *   - relays awareness (shared cursors / selections)
+ *   - tracks presence (who is in the room)
+ *   - passes through WebRTC signaling for peer-to-peer video/audio
+ *
+ * Rooms are ephemeral and in-memory (no DB persistence in this MVP): when the
+ * last participant leaves, the room's state is dropped.
+ */
+import { Server, Socket } from 'socket.io';
+import * as Y from 'yjs';
+import jwt from 'jsonwebtoken';
+import env from '../config/env.config';
+
+interface RoomState {
+  docs: Map<string, Y.Doc>;
+}
+
+const rooms = new Map<string, RoomState>();
+
+const getRoom = (roomId: string): RoomState => {
+  let room = rooms.get(roomId);
+  if (!room) {
+    room = { docs: new Map() };
+    rooms.set(roomId, room);
+  }
+  return room;
+};
+
+const getDoc = (roomId: string, docKey: string): Y.Doc => {
+  const room = getRoom(roomId);
+  let doc = room.docs.get(docKey);
+  if (!doc) {
+    doc = new Y.Doc();
+    room.docs.set(docKey, doc);
+  }
+  return doc;
+};
+
+export const registerRoomNamespace = (io: Server): void => {
+  const nsp = io.of('/room');
+
+  nsp.on('connection', (socket: Socket) => {
+    const query = socket.handshake.query as Record<string, string>;
+    const roomId = query.roomId;
+    const accessToken = query.accessToken;
+    const name = query.name;
+
+    if (!roomId || !accessToken) return socket.disconnect();
+
+    let email = '';
+    try {
+      const decoded = jwt.verify(accessToken, env.ACCESS_TOKEN_SECRET) as {
+        email: string;
+      };
+      email = decoded.email;
+    } catch {
+      return socket.disconnect();
+    }
+
+    const displayName = name || email || 'Guest';
+    (socket as any).displayName = displayName;
+
+    socket.join(roomId);
+
+    const listPeers = () =>
+      Array.from(nsp.adapter.rooms.get(roomId) || [])
+        .filter((id) => id !== socket.id)
+        .map((id) => ({
+          id,
+          name: (nsp.sockets.get(id) as any)?.displayName || 'Guest',
+        }));
+
+    // Tell the newcomer who is already here (so it can initiate WebRTC to them).
+    socket.emit('room:peers', listPeers());
+
+    // Clients (e.g. the video component, which mounts after acquiring camera)
+    // can re-request the peer list once they are ready.
+    socket.on('room:get-peers', () => socket.emit('room:peers', listPeers()));
+
+    // Tell existing peers a newcomer arrived.
+    socket.to(roomId).emit('room:peer-joined', {
+      id: socket.id,
+      name: displayName,
+    });
+
+    // --- Yjs docs (code, whiteboard, ...) ---
+    socket.on('room:subscribe', (docKey: string) => {
+      const doc = getDoc(roomId, docKey);
+      socket.emit('room:sync', {
+        docKey,
+        update: Array.from(Y.encodeStateAsUpdate(doc)),
+      });
+    });
+
+    socket.on(
+      'room:update',
+      ({ docKey, update }: { docKey: string; update: number[] }) => {
+        const doc = getDoc(roomId, docKey);
+        Y.applyUpdate(doc, new Uint8Array(update));
+        socket.to(roomId).emit('room:update', { docKey, update });
+      }
+    );
+
+    socket.on('room:awareness', (payload: { docKey: string; update: number[] }) => {
+      socket.to(roomId).emit('room:awareness', payload);
+    });
+
+    // --- WebRTC signaling passthrough (peer-to-peer video/audio) ---
+    socket.on('rtc:signal', ({ to, signal }: { to: string; signal: unknown }) => {
+      nsp.to(to).emit('rtc:signal', { from: socket.id, signal });
+    });
+
+    socket.on('disconnect', () => {
+      socket.to(roomId).emit('room:peer-left', { id: socket.id });
+      const clients = nsp.adapter.rooms.get(roomId);
+      if (!clients || clients.size === 0) rooms.delete(roomId);
+    });
+  });
+};

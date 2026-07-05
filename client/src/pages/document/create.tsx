@@ -6,6 +6,7 @@ import useDocuments from '../../hooks/use-documents';
 import useAuth from '../../hooks/use-auth';
 import DocumentsList from '../../components/molecules/documents-list';
 import CreateDocumentButton from '../../components/atoms/create-document-button';
+import StartSessionButton from '../../components/atoms/start-session-button';
 import DocumentInterface from '../../types/interfaces/document';
 
 const matchesQuery = (document: DocumentInterface, query: string) => {
@@ -56,7 +57,10 @@ const Create = () => {
                 : 'Pick up where you left off, or start something new.'}
             </p>
           </div>
-          <CreateDocumentButton />
+          <div className="flex items-center gap-2">
+            <StartSessionButton />
+            <CreateDocumentButton />
+          </div>
         </div>
 
         {loading ? (
