@@ -86,6 +86,7 @@ const DocumentMenuButton = ({
         children={
           <div
             ref={dropdownRef}
+            onMouseDown={(e) => e.preventDefault()}
             className="absolute top-full right-0 mt-1 z-10 w-52 bg-white py-1.5 rounded-lg shadow-lg border border-paper-2 document-menu"
           >
             {!confirming ? (
