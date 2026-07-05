@@ -22,7 +22,9 @@ services:
     runtime: node
     plan: free
     rootDir: server
-    buildCommand: npm install && npm run build
+    # --include=dev: NODE_ENV=production would otherwise skip devDeps, but the
+    # build needs typescript/@types to compile.
+    buildCommand: npm install --include=dev && npm run build
     startCommand: node dist/src/server.js
     envVars:
       - key: NODE_ENV
@@ -65,7 +67,7 @@ services:
     name: collab-docs-web
     runtime: static
     rootDir: client
-    buildCommand: npm install --legacy-peer-deps && CI=false npm run build
+    buildCommand: npm install --legacy-peer-deps --include=dev && CI=false npm run build
     staticPublishPath: ./build
     envVars:
       # Set to the deployed API URL WITH a trailing slash, then redeploy.
