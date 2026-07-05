@@ -57,23 +57,28 @@ const Whiteboard = ({ socket }: WhiteboardProps) => {
       };
       yStore.observeDeep(observer);
 
-      // Initial reconciliation.
-      if (yStore.size > 0) {
-        // Load an existing board from a participant who is already here.
-        store.mergeRemoteChanges(() => {
-          store.put(Array.from(yStore.values()));
-        });
-      } else {
-        // Seed the shared doc with our document-scoped records.
-        const docRecords = store.serialize('document');
-        ydoc.transact(() => {
-          Object.entries(docRecords).forEach(([id, record]) =>
-            yStore.set(id, record as TLRecord)
-          );
-        });
-      }
+      // Reconcile only AFTER the server's initial sync arrives, so two clients
+      // don't both seed an empty board and diverge onto different pages.
+      // bindYDocToRoom already applied the sync into yStore (and the observer
+      // loaded it into the store); we only seed if the room is still empty
+      // afterwards — i.e. we're genuinely the first participant.
+      let reconciled = false;
+      const reconcile = ({ docKey }: { docKey: string }) => {
+        if (docKey !== 'whiteboard' || reconciled) return;
+        reconciled = true;
+        if (yStore.size === 0) {
+          const docRecords = store.serialize('document');
+          ydoc.transact(() => {
+            Object.entries(docRecords).forEach(([id, record]) =>
+              yStore.set(id, record as TLRecord)
+            );
+          });
+        }
+      };
+      socket.on('room:sync', reconcile);
 
       return () => {
+        socket.off('room:sync', reconcile);
         unlisten();
         yStore.unobserveDeep(observer);
         unbind();
