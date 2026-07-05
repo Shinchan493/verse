@@ -5,8 +5,9 @@ import './assets/css/transitions.css';
 import './assets/css/spinners.css';
 import './assets/css/toasts.css';
 import './assets/css/fonts.css';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import Document from './pages/document';
+import Landing from './pages/landing';
 import { ToastProvider } from './contexts/toast-context';
 import { AuthProvider } from './contexts/auth-context';
 import Login from './pages/login';
@@ -39,10 +40,7 @@ ReactDOM.render(
               path="/document/create"
               element={<AuthRoute element={<Create />} />}
             />
-            <Route
-              path="/"
-              element={<Navigate replace to="/document/create" />}
-            />
+            <Route path="/" element={<Landing />} />
             <Route path="/login" element={<Login />} />
             <Route path="/register" element={<Register />} />
             <Route path="/user/verify-email/:token" element={<VerifyEmail />} />

@@ -69,7 +69,7 @@ const DocumentMenuBar = () => {
   };
 
   return (
-    <div className="w-full flex justify-between items-center px-3 pb-1 border-b">
+    <div className="w-full flex justify-between items-center px-4 pb-1 border-b border-paper-2 bg-paper">
       {/* Left */}
       <div className="w-full flex justify-start items-center overflow-x-hidden md:overflow-visible">
         <Logo />
@@ -80,37 +80,15 @@ const DocumentMenuBar = () => {
             onBlur={(event) => handleTitleInputBlur(event)}
             onChange={(event) => handleTitleInputChange(event)}
             value={document?.title ? document?.title : ''}
-            className="font-medium text-lg px-2 pt-2"
+            className="font-serif font-medium text-lg px-2 pt-1 bg-transparent rounded focus:outline-none focus:ring-1 focus:ring-accent-soft"
             name=""
             id=""
-            placeholder="Untitled Document"
+            placeholder="Untitled document"
           />
-          <div className="flex items-center">
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              File
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Edit
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              View
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Insert
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Format
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Tools
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Add-ons
-            </button>
-            <button className="text-sm whitespace-nowrap px-2 py-1 font-medium hover:bg-gray-100 rounded-md">
-              Help
-            </button>
-            {saving && <p className="text-sm text-gray-500 px-2">Saving...</p>}
+          <div className="flex items-center h-5 px-2">
+            <p className="text-xs text-ink-faint">
+              {saving ? 'Saving…' : 'All changes saved'}
+            </p>
           </div>
         </div>
       </div>

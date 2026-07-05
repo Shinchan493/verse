@@ -21,7 +21,10 @@ const Create = () => {
       : documents.filter((document) => document.userId !== userId);
 
   return (
-    <div style={{ height: heightStr }}>
+    <div
+      style={{ height: heightStr }}
+      className="bg-paper text-ink font-sans overflow-y-auto"
+    >
       <DocumentCreateHeader />
       <CreateDocumentButton />
       {loading ? (

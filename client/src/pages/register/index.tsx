@@ -1,8 +1,7 @@
-import useWindowSize from '../../hooks/use-window-size';
 import TextField from '../../components/atoms/text-field/text-field';
 import { KeyboardEvent, useContext, useState } from 'react';
 import { ToastContext } from '../../contexts/toast-context';
-import Logo from '../../components/atoms/logo';
+import Wordmark from '../../components/atoms/wordmark';
 import validator from 'validator';
 import Spinner from '../../components/atoms/spinner';
 import { Link, useNavigate } from 'react-router-dom';
@@ -10,7 +9,6 @@ import axios, { AxiosError } from 'axios';
 import AuthService from '../../services/auth-service';
 
 const Register = () => {
-  const { widthStr, heightStr } = useWindowSize();
   const [email, setEmail] = useState('');
   const [emailErrors, setEmailErrors] = useState<Array<string>>([]);
   const [loading, setLoading] = useState(false);
@@ -34,7 +32,7 @@ const Register = () => {
     if (!(password1.length >= 8 && password1.length <= 25)) {
       setPassword1Errors((prev) => [
         ...prev,
-        'Password must be between 1 and 25 characters.',
+        'Password must be between 8 and 25 characters.',
       ]);
       isValid = false;
     }
@@ -56,6 +54,7 @@ const Register = () => {
   const register = async () => {
     if (!validate()) return;
 
+    setLoading(true);
     try {
       await AuthService.register({
         email,
@@ -64,8 +63,8 @@ const Register = () => {
       });
 
       addToast({
-        title: `Successfully registered ${email}!`,
-        body: 'Please check your inbox to verify your email address',
+        title: `Welcome to Verse, ${email}!`,
+        body: 'Your account is ready — sign in to start writing.',
         color: 'success',
       });
       navigate('/login');
@@ -118,64 +117,84 @@ const Register = () => {
   };
 
   return (
-    <div
-      onKeyPress={handleOnKeyPress}
-      className="w-full flex flex-col sm:justify-center items-center p-6 sm:pb-96 bg-gray-100 dark:bg-slate-900 text-primary"
-      style={{ width: widthStr, height: heightStr }}
-    >
-      <div className="w-full max-w-sm bg-white dark:bg-slate-800 rounded border-primary shadow-md border dark:border-0 dark:shadow-xl p-6">
-        <div className="flex flex-col space-y-4">
-          <div className="w-full text-center flex flex-col justify-center items-center">
-            <Logo />
-            <h1 className="font-medium text-2xl">Sign up</h1>
-            <p className="font-medium">for a Docs account</p>
-          </div>
-          <TextField
-            value={email}
-            onInput={handleOnInputEmail}
-            label="Email"
-            color="secondary"
-            errors={emailErrors}
-          />
-          <TextField
-            value={password1}
-            onInput={handleOnInputPassword1}
-            label="Password"
-            type="password"
-            color="secondary"
-            errors={password1Errors}
-          />
-          <TextField
-            value={password2}
-            onInput={handleOnInputPassword2}
-            label="Confirm Password"
-            type="password"
-            color="secondary"
-            errors={password2Errors}
-          />
-          <Link
-            to="/login"
-            className="text-sm hover:underline font-semibold text-blue-500 text-left"
-          >
-            Sign in instead
-          </Link>
-          <button
-            onClick={register}
-            disabled={loading}
-            className="bg-blue-600 text-white text-sm font-semibold px-3 py-2 rounded hover:bg-blue-500 flex justify-center items-center space-x-1 active:ring-1"
-          >
-            <span className={`${loading && 'opacity-0'}`}>Register</span>
-            {loading && <Spinner size="sm" />}
-          </button>
+    <div className="min-h-screen w-full flex font-sans text-ink">
+      {/* Brand panel */}
+      <div className="hidden lg:flex lg:w-1/2 bg-ink text-paper flex-col justify-between p-14">
+        <Wordmark to="/" size="md" invert />
+        <div className="max-w-md">
+          <h2 className="font-serif text-5xl font-semibold leading-tight tracking-tight">
+            Your first page is a blank one.
+          </h2>
+          <p className="mt-6 text-paper/60 text-lg leading-relaxed">
+            Create an account and open a document in seconds. Invite anyone —
+            everyone edits together, live.
+          </p>
         </div>
+        <p className="text-paper/40 text-sm">
+          © {new Date().getFullYear()} Verse
+        </p>
       </div>
-      <div className="flex justify-center space-x-4 text-sm p-4">
-        <button className="hover:underline font-semibold text-blue-500">
-          Terms
-        </button>
-        <button className="hover:underline font-semibold text-blue-500">
-          Privacy Policy
-        </button>
+
+      {/* Form panel */}
+      <div
+        onKeyPress={handleOnKeyPress}
+        className="w-full lg:w-1/2 bg-paper flex flex-col justify-center items-center p-6 sm:p-12"
+      >
+        <div className="w-full max-w-sm">
+          <div className="lg:hidden mb-10">
+            <Wordmark to="/" />
+          </div>
+
+          <h1 className="font-serif text-4xl font-semibold tracking-tight">
+            Create your account
+          </h1>
+          <p className="mt-2 text-ink-soft">Start writing on Verse — it’s free.</p>
+
+          <div className="mt-9 flex flex-col space-y-5">
+            <TextField
+              value={email}
+              onInput={handleOnInputEmail}
+              label="Email"
+              color="secondary"
+              errors={emailErrors}
+            />
+            <TextField
+              value={password1}
+              onInput={handleOnInputPassword1}
+              label="Password"
+              type="password"
+              color="secondary"
+              errors={password1Errors}
+            />
+            <TextField
+              value={password2}
+              onInput={handleOnInputPassword2}
+              label="Confirm password"
+              type="password"
+              color="secondary"
+              errors={password2Errors}
+            />
+
+            <button
+              onClick={register}
+              disabled={loading}
+              className="bg-accent text-paper text-sm font-semibold px-3 py-3 rounded-lg hover:bg-accent-hover transition-colors flex justify-center items-center shadow-sm disabled:opacity-70"
+            >
+              <span className={`${loading && 'opacity-0'}`}>Create account</span>
+              {loading && <Spinner size="sm" />}
+            </button>
+          </div>
+
+          <p className="mt-8 text-sm text-ink-soft">
+            Already have an account?{' '}
+            <Link
+              to="/login"
+              className="font-semibold text-accent hover:underline"
+            >
+              Sign in
+            </Link>
+          </p>
+        </div>
       </div>
     </div>
   );
