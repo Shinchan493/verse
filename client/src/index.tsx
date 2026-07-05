@@ -1,3 +1,4 @@
+import './polyfills';
 import { createRoot } from 'react-dom/client';
 import './assets/css/index.css';
 import './assets/css/transitions.css';
