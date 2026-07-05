@@ -7,6 +7,7 @@ import { ToastContext } from '../../contexts/toast-context';
 import CollabCodeEditor from './CollabCodeEditor';
 import Whiteboard from './Whiteboard';
 import VideoCall from './VideoCall';
+import PaneErrorBoundary from './PaneErrorBoundary';
 import { colorForName } from './room-yjs';
 
 interface Participant {
@@ -112,11 +113,27 @@ const Room = () => {
       {/* Split: code | whiteboard */}
       <div className="flex-1 flex min-h-0">
         <div style={{ width: '58%' }} className="min-w-0 h-full">
-          {socket && <CollabCodeEditor socket={socket} me={me} />}
+          <PaneErrorBoundary label="Code editor">
+            {socket ? (
+              <CollabCodeEditor socket={socket} me={me} />
+            ) : (
+              <div className="h-full grid place-items-center text-white/40 text-sm">
+                Connecting to room…
+              </div>
+            )}
+          </PaneErrorBoundary>
         </div>
         <div className="w-px bg-white/10 flex-shrink-0" />
         <div className="flex-1 min-w-0 h-full bg-white">
-          {socket && <Whiteboard socket={socket} />}
+          <PaneErrorBoundary label="Whiteboard">
+            {socket ? (
+              <Whiteboard socket={socket} />
+            ) : (
+              <div className="h-full grid place-items-center text-ink-faint text-sm">
+                Connecting to room…
+              </div>
+            )}
+          </PaneErrorBoundary>
         </div>
       </div>
     </div>
