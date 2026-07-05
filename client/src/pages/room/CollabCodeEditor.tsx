@@ -82,12 +82,6 @@ body {
 `,
 };
 
-const TEMPLATE_SET = new Set(Object.values(TEMPLATES).map((t) => t.trim()));
-const isReplaceable = (text: string) => {
-  const trimmed = text.trim();
-  return trimmed.length === 0 || TEMPLATE_SET.has(trimmed);
-};
-
 const baseTheme = EditorView.theme({
   '&': { height: '100%', fontSize: '14px' },
   '.cm-scroller': {
@@ -118,6 +112,7 @@ const darkExtension = [
 const lightExtension = EditorView.theme(
   {
     '&': { backgroundColor: '#ffffff', color: '#1a1a1a' },
+    '.cm-content': { caretColor: '#1a1a1a' },
     '.cm-gutters': {
       backgroundColor: '#faf7f2',
       borderRight: '1px solid #f2ece1',
@@ -125,7 +120,13 @@ const lightExtension = EditorView.theme(
     },
     '.cm-activeLine': { backgroundColor: 'rgba(180,83,9,0.04)' },
     '.cm-activeLineGutter': { backgroundColor: 'rgba(180,83,9,0.06)' },
-    '.cm-cursor': { borderLeftColor: '#1a1a1a' },
+    '.cm-cursor, .cm-cursor-primary': {
+      borderLeftColor: '#1a1a1a',
+      borderLeftWidth: '2px',
+    },
+    '.cm-selectionBackground, &.cm-focused .cm-selectionBackground': {
+      backgroundColor: 'rgba(180,83,9,0.15)',
+    },
   },
   { dark: false }
 );
@@ -141,19 +142,22 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   const themeCompartmentRef = useRef(new Compartment());
   const ytextRef = useRef<Y.Text | null>(null);
   const langRef = useRef('JavaScript');
+  // The content is "pristine" while it's still just a template (or empty) —
+  // i.e. no user typing and no peer edit has happened. Only then do we swap
+  // templates on a language change.
+  const pristineRef = useRef(true);
   const [language, setLanguage] = useState('JavaScript');
 
   const applyTemplate = (lang: string) => {
     const ytext = ytextRef.current;
     const doc = ytext?.doc;
-    if (!ytext || !doc) return;
-    if (!isReplaceable(ytext.toString())) return;
+    if (!ytext || !doc || !pristineRef.current) return;
     const template = TEMPLATES[lang];
     if (!template) return;
     doc.transact(() => {
       if (ytext.length > 0) ytext.delete(0, ytext.length);
       ytext.insert(0, template);
-    });
+    }, 'template');
   };
 
   useEffect(() => {
@@ -162,6 +166,14 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText('codemirror');
     ytextRef.current = ytext;
+
+    // Any change that isn't our own template insertion (user typing, a peer
+    // edit, or loading an existing room) marks the content as edited.
+    const onYTextChange = (_e: Y.YTextEvent, txn: Y.Transaction) => {
+      if (txn.origin !== 'template') pristineRef.current = false;
+    };
+    ytext.observe(onYTextChange);
+
     const awareness = new Awareness(ydoc);
     const color = colorForName(me);
     awareness.setLocalStateField('user', {
@@ -197,6 +209,7 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
 
     return () => {
       socket.off('room:sync', onCodeSync);
+      ytext.unobserve(onYTextChange);
       view.destroy();
       viewRef.current = null;
       unbind();
