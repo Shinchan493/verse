@@ -127,14 +127,3 @@ Open **http://localhost:3000**, register, and start writing — or hit **Start a
 ## Deployment
 
 The repo includes a `render.yaml` blueprint (Postgres + Node API + static frontend). The frontend needs `REACT_APP_API_URL` set to the API URL (with a trailing slash); the API needs `FRONT_END_URL` set to the frontend origin (for CORS). WebRTC video requires HTTPS, which hosts like Render provide.
-
----
-
-## Credits
-
-- Original project: [noahskorner/google-docs-clone](https://github.com/noahskorner/google-docs-clone)
-- Built on the excellent open-source work of Yjs, Quill, CodeMirror, tldraw, and Socket.IO.
-
-## License
-
-See [LICENSE](LICENSE) if present. If you plan to reuse this project, please keep the attribution above.
