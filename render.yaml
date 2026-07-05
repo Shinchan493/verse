@@ -1,0 +1,77 @@
+# Render Blueprint — provisions the whole app in one go:
+#   - Postgres database
+#   - Node backend (Express + Socket.IO / WebSockets, single instance)
+#   - Static React frontend (CRA build)
+# Docs: https://render.com/docs/blueprint-spec
+#
+# After the first deploy, set the two cross-referencing URL vars and redeploy:
+#   collab-docs-api  -> FRONT_END_URL   = https://<frontend>.onrender.com
+#   collab-docs-web  -> REACT_APP_API_URL = https://<api>.onrender.com/   (trailing slash!)
+
+databases:
+  - name: collab-docs-db
+    plan: free
+    databaseName: collab_docs
+    user: collab_docs
+
+services:
+  # --- Backend API (WebSocket server; keep to a single instance: Yjs docs are
+  #     held in memory, so scaling out needs a shared adapter/persistence) ---
+  - type: web
+    name: collab-docs-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: node dist/src/server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_URL
+        fromDatabase:
+          name: collab-docs-db
+          property: connectionString
+      - key: ACCESS_TOKEN_SECRET
+        generateValue: true
+      - key: ACCESS_TOKEN_EXPIRATION
+        value: 15m
+      - key: REFRESH_TOKEN_SECRET
+        generateValue: true
+      - key: REFRESH_TOKEN_EXPIRATION
+        value: 7d
+      - key: VERIFY_EMAIL_SECRET
+        generateValue: true
+      - key: PASSWORD_RESET_SECRET
+        generateValue: true
+      - key: PASSWORD_RESET_EXPIRATION
+        value: 1h
+      # No SMTP provider in this demo -> users are verified immediately on signup.
+      - key: AUTO_VERIFY_USERS
+        value: 'true'
+      - key: SMTP_HOST
+        value: unused
+      - key: SMTP_USER
+        value: unused
+      - key: SMTP_PASSWORD
+        value: unused
+      # Set to the deployed frontend URL after first deploy (used for CORS + socket origin).
+      - key: FRONT_END_URL
+        sync: false
+
+  # --- Frontend (static CRA build) ---
+  - type: web
+    name: collab-docs-web
+    runtime: static
+    rootDir: client
+    buildCommand: npm install --legacy-peer-deps && CI=false npm run build
+    staticPublishPath: ./build
+    envVars:
+      # Set to the deployed API URL WITH a trailing slash, then redeploy.
+      - key: REACT_APP_API_URL
+        sync: false
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html

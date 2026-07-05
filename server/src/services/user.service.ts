@@ -50,12 +50,20 @@ class UserService {
     const salt = await genSalt();
     const hashedPassword = await hash(password, salt);
     const verificationToken = jwt.sign({ email }, env.VERIFY_EMAIL_SECRET);
+
+    // AUTO_VERIFY_USERS lets a deploy skip the email step entirely (useful when
+    // there is no SMTP provider configured, e.g. a portfolio demo). Users are
+    // created already-verified and no verification email is sent.
+    const autoVerify = process.env.AUTO_VERIFY_USERS === 'true';
+
     const user = await User.create({
       email: email,
       password: hashedPassword,
       verificationToken: verificationToken,
+      isVerified: autoVerify,
     });
-    await this.sendVerificationEmail(user);
+
+    if (!autoVerify) await this.sendVerificationEmail(user);
   };
 
   public checkPassword = async (

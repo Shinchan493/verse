@@ -1,13 +1,11 @@
+// The individual DB vars (USER/PASSWORD/DB_HOST/DB_PORT/DATABASE) are only used
+// by the local dev/test Sequelize config; production connects via DATABASE_URL,
+// so they are not required there (see db.config.ts).
 if (
   process.env.NODE_ENV === undefined ||
   process.env.HOST === undefined ||
   process.env.PORT === undefined ||
   process.env.DATABASE_URL === undefined ||
-  process.env.USER === undefined ||
-  process.env.PASSWORD === undefined ||
-  process.env.DB_HOST === undefined ||
-  process.env.DB_PORT === undefined ||
-  process.env.DATABASE === undefined ||
   process.env.SMTP_HOST === undefined ||
   process.env.SMTP_USER === undefined ||
   process.env.SMTP_PASSWORD === undefined ||
@@ -28,11 +26,11 @@ const env = {
   HOST: process.env.HOST,
   PORT: process.env.PORT,
   DATABASE_URL: process.env.DATABASE_URL,
-  USER: process.env.USER,
-  PASSWORD: process.env.PASSWORD,
-  DB_HOST: process.env.DB_HOST,
-  DB_PORT: process.env.DB_PORT,
-  DATABASE: process.env.DATABASE,
+  USER: process.env.USER ?? '',
+  PASSWORD: process.env.PASSWORD ?? '',
+  DB_HOST: process.env.DB_HOST ?? '',
+  DB_PORT: process.env.DB_PORT ?? '',
+  DATABASE: process.env.DATABASE ?? '',
   SMTP_HOST: process.env.SMTP_HOST,
   SMTP_USER: process.env.SMTP_USER,
   SMTP_PASSWORD: process.env.SMTP_PASSWORD,
