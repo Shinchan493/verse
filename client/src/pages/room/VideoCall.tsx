@@ -31,7 +31,7 @@ const VideoTile = ({
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
   return (
-    <div className="relative w-40 h-28 rounded-lg overflow-hidden bg-black flex-shrink-0 ring-1 ring-white/10">
+    <div className="relative w-32 h-20 rounded-xl overflow-hidden bg-ink flex-shrink-0 ring-1 ring-black/5">
       <video
         ref={ref}
         autoPlay
@@ -39,7 +39,7 @@ const VideoTile = ({
         muted={muted}
         className="w-full h-full object-cover"
       />
-      <span className="absolute bottom-1 left-1.5 text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">
+      <span className="absolute bottom-1 left-1.5 max-w-[80%] truncate text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">
         {label}
       </span>
     </div>
@@ -176,7 +176,7 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
   return (
     <div className="flex items-center gap-2">
       {error ? (
-        <span className="text-xs text-white/50 px-2">{error}</span>
+        <span className="text-xs text-ink-faint px-3 py-6">{error}</span>
       ) : (
         <>
           {localStream && (
@@ -185,12 +185,14 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
           {remotePeers.map((p) => (
             <VideoTile key={p.id} stream={p.stream} label={p.name} />
           ))}
-          <div className="flex flex-col gap-1.5 pl-1">
+          <div className="flex items-center gap-1.5 pl-1">
             <button
               onClick={toggleMic}
               title="Toggle microphone"
-              className={`w-8 h-8 rounded-full grid place-items-center ${
-                micOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white'
+              className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
+                micOn
+                  ? 'bg-paper hover:bg-paper-2 text-ink border border-paper-2'
+                  : 'bg-red-600 text-white'
               }`}
             >
               <MicrophoneIcon className="w-4 h-4" />
@@ -198,8 +200,10 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
             <button
               onClick={toggleCam}
               title="Toggle camera"
-              className={`w-8 h-8 rounded-full grid place-items-center ${
-                camOn ? 'bg-white/10 text-white' : 'bg-red-600 text-white'
+              className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
+                camOn
+                  ? 'bg-paper hover:bg-paper-2 text-ink border border-paper-2'
+                  : 'bg-red-600 text-white'
               }`}
             >
               <VideoCameraIcon className="w-4 h-4" />

@@ -1,9 +1,15 @@
 import { useContext, useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { io, Socket } from 'socket.io-client';
+import {
+  ClipboardCopyIcon,
+  LogoutIcon,
+  PencilAltIcon,
+} from '@heroicons/react/outline';
 import { BASE_URL } from '../../services/api';
 import useAuth from '../../hooks/use-auth';
 import { ToastContext } from '../../contexts/toast-context';
+import Wordmark from '../../components/atoms/wordmark';
 import CollabCodeEditor from './CollabCodeEditor';
 import Whiteboard from './Whiteboard';
 import VideoCall from './VideoCall';
@@ -14,6 +20,31 @@ interface Participant {
   id: string;
   name: string;
 }
+
+const Avatar = ({ name, ring }: { name: string; ring: string }) => (
+  <span
+    title={name}
+    style={{ backgroundColor: colorForName(name) }}
+    className={`w-8 h-8 rounded-full grid place-items-center text-xs font-semibold text-white uppercase ring-2 ${ring}`}
+  >
+    {name[0]}
+  </span>
+);
+
+const PanelLabel = ({
+  icon,
+  children,
+}: {
+  icon: JSX.Element;
+  children: React.ReactNode;
+}) => (
+  <div className="flex items-center gap-2 px-4 py-2 border-b border-paper-2 bg-paper flex-shrink-0">
+    <span className="text-ink-faint">{icon}</span>
+    <span className="text-xs font-semibold uppercase tracking-wide text-ink-soft">
+      {children}
+    </span>
+  </div>
+);
 
 const Room = () => {
   const { id: roomId } = useParams();
@@ -62,78 +93,98 @@ const Room = () => {
   };
 
   const everyone = [{ id: 'me', name: me }, ...participants];
+  const alone = participants.length === 0;
 
   return (
-    <div className="h-screen flex flex-col bg-[#161616] text-white font-sans overflow-hidden">
+    <div className="h-screen flex flex-col bg-paper text-ink font-sans overflow-hidden">
       {/* Top bar */}
-      <header className="flex items-center justify-between gap-4 px-4 py-2 border-b border-white/10 bg-[#111] flex-shrink-0">
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <span className="grid place-items-center w-8 h-8 rounded-lg bg-paper text-ink font-serif font-semibold">
-            V
-          </span>
-          <div className="leading-tight">
-            <p className="text-sm font-semibold">Verse Live</p>
-            <p className="text-[11px] text-white/40">Room · {roomId}</p>
+      <header className="flex items-center justify-between gap-4 px-5 py-2.5 border-b border-paper-2 bg-white flex-shrink-0">
+        <div className="flex items-center gap-4 min-w-0">
+          <Wordmark to="/document/create" size="sm" />
+          <span className="h-6 w-px bg-paper-2 hidden sm:block" />
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500" />
+            </span>
+            <span className="font-serif text-lg font-semibold">Live Session</span>
           </div>
           <button
             onClick={copyLink}
-            className="ml-2 text-xs font-medium text-white/70 hover:text-white bg-white/10 px-3 py-1.5 rounded-full"
+            className="hidden md:flex items-center gap-2 bg-paper hover:bg-paper-2 border border-paper-2 rounded-full pl-3 pr-2 py-1.5 transition-colors"
           >
-            Copy invite link
+            <span className="font-mono text-xs text-ink-soft">{roomId}</span>
+            <ClipboardCopyIcon className="w-4 h-4 text-ink-faint" />
           </button>
         </div>
 
-        {/* Video strip */}
-        <div className="flex-1 flex justify-center overflow-x-auto">
-          {socket && <VideoCall socket={socket} me={me} />}
-        </div>
-
-        <div className="flex items-center gap-3 flex-shrink-0">
-          <div className="flex -space-x-2">
-            {everyone.slice(0, 5).map((p) => (
-              <span
-                key={p.id}
-                title={p.name}
-                style={{ backgroundColor: colorForName(p.name) }}
-                className="w-7 h-7 rounded-full grid place-items-center text-[11px] font-semibold uppercase ring-2 ring-[#111]"
-              >
-                {p.name[0]}
-              </span>
-            ))}
+        <div className="flex items-center gap-4 flex-shrink-0">
+          <div className="hidden sm:flex items-center gap-2">
+            <div className="flex -space-x-2">
+              {everyone.slice(0, 5).map((p) => (
+                <Avatar key={p.id} name={p.name} ring="ring-white" />
+              ))}
+            </div>
+            <span className="text-xs text-ink-faint">
+              {everyone.length} in room
+            </span>
           </div>
           <button
             onClick={() => navigate('/document/create')}
-            className="text-xs font-semibold bg-red-600 hover:bg-red-700 px-3 py-1.5 rounded-full"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-red-600 border border-paper-2 hover:border-red-200 hover:bg-red-50 px-3.5 py-1.5 rounded-full transition-colors"
           >
+            <LogoutIcon className="w-4 h-4" />
             Leave
           </button>
         </div>
       </header>
 
-      {/* Split: code | whiteboard */}
-      <div className="flex-1 flex min-h-0">
-        <div style={{ width: '58%' }} className="min-w-0 h-full">
+      {/* Workspace */}
+      <div className="flex-1 flex min-h-0 relative">
+        {/* Code */}
+        <div
+          style={{ width: '57%' }}
+          className="min-w-0 h-full flex flex-col border-r border-paper-2"
+        >
           <PaneErrorBoundary label="Code editor">
             {socket ? (
               <CollabCodeEditor socket={socket} me={me} />
             ) : (
-              <div className="h-full grid place-items-center text-white/40 text-sm">
+              <div className="h-full grid place-items-center text-ink-faint text-sm bg-[#282c34]">
                 Connecting to room…
               </div>
             )}
           </PaneErrorBoundary>
         </div>
-        <div className="w-px bg-white/10 flex-shrink-0" />
-        <div className="flex-1 min-w-0 h-full bg-white">
-          <PaneErrorBoundary label="Whiteboard">
-            {socket ? (
-              <Whiteboard socket={socket} />
-            ) : (
-              <div className="h-full grid place-items-center text-ink-faint text-sm">
-                Connecting to room…
-              </div>
+
+        {/* Whiteboard */}
+        <div className="flex-1 min-w-0 h-full flex flex-col bg-white">
+          <PanelLabel icon={<PencilAltIcon className="w-4 h-4" />}>
+            Whiteboard
+          </PanelLabel>
+          <div className="flex-1 min-h-0">
+            <PaneErrorBoundary label="Whiteboard">
+              {socket ? (
+                <Whiteboard socket={socket} />
+              ) : (
+                <div className="h-full grid place-items-center text-ink-faint text-sm">
+                  Connecting to room…
+                </div>
+              )}
+            </PaneErrorBoundary>
+          </div>
+        </div>
+
+        {/* Floating video call bar */}
+        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
+          <div className="bg-white/90 backdrop-blur-md border border-paper-2 rounded-2xl shadow-[0_12px_40px_-12px_rgba(26,26,26,0.35)] px-3 py-2">
+            {socket && <VideoCall socket={socket} me={me} />}
+            {alone && (
+              <p className="text-[11px] text-ink-faint text-center pt-1.5">
+                Waiting for others — share the invite link.
+              </p>
             )}
-          </PaneErrorBoundary>
+          </div>
         </div>
       </div>
     </div>
