@@ -1,5 +1,6 @@
 import { Link } from 'react-router-dom';
 import Wordmark from '../../components/atoms/wordmark';
+import useAuth from '../../hooks/use-auth';
 
 const FEATURES = [
   {
@@ -31,6 +32,11 @@ const FEATURES = [
 ];
 
 const Landing = () => {
+  const { isAuthenticated } = useAuth();
+  // "it's free" implies signing up: send new visitors to Create account, and
+  // send already-signed-in users straight into the app.
+  const startHref = isAuthenticated ? '/document/create' : '/register';
+
   return (
     <div className="min-h-screen bg-paper text-ink font-sans antialiased">
       {/* Nav */}
@@ -44,7 +50,7 @@ const Landing = () => {
             Log in
           </Link>
           <Link
-            to="/document/create"
+            to={startHref}
             className="text-sm font-semibold text-paper bg-ink px-4 py-2 rounded-full hover:bg-black transition-colors"
           >
             Start writing
@@ -69,7 +75,7 @@ const Landing = () => {
           </p>
           <div className="mt-9 flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <Link
-              to="/document/create"
+              to={startHref}
               className="w-full sm:w-auto text-center font-semibold text-paper bg-accent hover:bg-accent-hover px-7 py-3.5 rounded-full transition-colors shadow-sm"
             >
               Start writing — it’s free
@@ -157,7 +163,7 @@ const Landing = () => {
             No setup, no clutter. Open a blank document and invite someone in.
           </p>
           <Link
-            to="/document/create"
+            to={startHref}
             className="inline-block mt-9 font-semibold text-ink bg-paper hover:bg-white px-8 py-3.5 rounded-full transition-colors"
           >
             Start writing
