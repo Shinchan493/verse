@@ -63,7 +63,7 @@ const Room = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showPeople, setShowPeople] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [theme, setTheme] = useState<Theme>('dark');
+  const [theme, setTheme] = useState<Theme>('light');
   const startRef = useRef(Date.now());
 
   const me = email ?? 'Guest';
