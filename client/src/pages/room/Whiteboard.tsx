@@ -103,7 +103,17 @@ const Whiteboard = ({ socket, theme }: WhiteboardProps) => {
 
   return (
     <div className="h-full w-full">
-      <Tldraw onMount={handleMount} />
+      {/*
+       * licenseKey is optional. Without one, tldraw runs on its free tier:
+       * it renders fully and adds a small "made with tldraw" watermark, and
+       * logs a "license required" notice in production (a warning, not a
+       * block). Set REACT_APP_TLDRAW_LICENSE_KEY only if you buy a business
+       * license to remove the watermark.
+       */}
+      <Tldraw
+        licenseKey={process.env.REACT_APP_TLDRAW_LICENSE_KEY}
+        onMount={handleMount}
+      />
     </div>
   );
 };
