@@ -17,6 +17,7 @@ import Wordmark from '../../components/atoms/wordmark';
 import CollabCodeEditor from './CollabCodeEditor';
 import Whiteboard from './Whiteboard';
 import VideoCall from './VideoCall';
+import DraggableVideoDock from './DraggableVideoDock';
 import PaneErrorBoundary from './PaneErrorBoundary';
 import { colorForName } from './room-yjs';
 
@@ -386,17 +387,16 @@ const Room = () => {
           </div>
         </div>
 
-        {/* Floating video call bar (kept dark in both themes) */}
-        <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-30">
-          <div className="bg-[#1c1c1c]/90 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl px-3 py-2">
-            {socket && <VideoCall socket={socket} me={me} />}
-            {alone && (
-              <p className="text-[11px] text-white/40 text-center pt-1.5">
-                Waiting for others — share the invite link.
-              </p>
-            )}
-          </div>
-        </div>
+        {/* Floating video call dock (kept dark in both themes) — draggable,
+            snaps to the nearest workspace corner */}
+        <DraggableVideoDock>
+          {socket && <VideoCall socket={socket} me={me} />}
+          {alone && (
+            <p className="text-[11px] text-white/40 text-center pt-1.5">
+              Waiting for others — share the invite link.
+            </p>
+          )}
+        </DraggableVideoDock>
       </div>
     </div>
   );
