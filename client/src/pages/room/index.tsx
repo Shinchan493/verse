@@ -66,6 +66,28 @@ const Room = () => {
   const [theme, setTheme] = useState<Theme>('light');
   const startRef = useRef(Date.now());
 
+  // Resizable split between code editor and whiteboard (% width of code pane)
+  const DEFAULT_SPLIT = 57;
+  const [codeWidth, setCodeWidth] = useState(DEFAULT_SPLIT);
+  const [resizing, setResizing] = useState(false);
+  const workspaceRef = useRef<HTMLDivElement>(null);
+
+  const onSplitPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setResizing(true);
+  };
+  const onSplitPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!resizing || !workspaceRef.current) return;
+    const rect = workspaceRef.current.getBoundingClientRect();
+    const pct = ((e.clientX - rect.left) / rect.width) * 100;
+    setCodeWidth(Math.min(78, Math.max(22, pct)));
+  };
+  const onSplitPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setResizing(false);
+  };
+
   const me = email ?? 'Guest';
   const dark = theme === 'dark';
 
@@ -271,11 +293,18 @@ const Room = () => {
       </header>
 
       {/* Workspace */}
-      <div className="flex-1 flex min-h-0 relative">
+      <div
+        ref={workspaceRef}
+        className={`flex-1 flex min-h-0 relative ${
+          resizing ? 'cursor-col-resize select-none' : ''
+        }`}
+      >
         {/* Code */}
         <div
-          style={{ width: '57%' }}
-          className={`min-w-0 h-full flex flex-col border-r ${t.border}`}
+          style={{ width: `${codeWidth}%` }}
+          className={`min-w-0 h-full flex flex-col ${
+            resizing ? 'pointer-events-none' : ''
+          }`}
         >
           <PaneErrorBoundary label="Code editor">
             {socket ? (
@@ -290,8 +319,48 @@ const Room = () => {
           </PaneErrorBoundary>
         </div>
 
+        {/* Resize handle */}
+        <div
+          role="separator"
+          aria-orientation="vertical"
+          title="Drag to resize — double-click to reset"
+          onPointerDown={onSplitPointerDown}
+          onPointerMove={onSplitPointerMove}
+          onPointerUp={onSplitPointerUp}
+          onDoubleClick={() => setCodeWidth(DEFAULT_SPLIT)}
+          className={`relative z-20 w-1.5 h-full flex-shrink-0 cursor-col-resize group flex items-center justify-center border-x transition-colors ${
+            t.border
+          } ${
+            resizing
+              ? 'bg-accent/40'
+              : dark
+              ? 'bg-[#0f0f0f] hover:bg-white/10'
+              : 'bg-paper hover:bg-paper-2'
+          }`}
+        >
+          {/* grip dots */}
+          <div
+            className={`flex flex-col gap-1 pointer-events-none ${
+              resizing ? 'opacity-100' : 'opacity-40 group-hover:opacity-100'
+            }`}
+          >
+            {[0, 1, 2].map((i) => (
+              <span
+                key={i}
+                className={`w-1 h-1 rounded-full ${
+                  dark ? 'bg-white/60' : 'bg-ink-faint'
+                }`}
+              />
+            ))}
+          </div>
+        </div>
+
         {/* Whiteboard */}
-        <div className={`flex-1 min-w-0 h-full flex flex-col ${t.wbBg}`}>
+        <div
+          className={`flex-1 min-w-0 h-full flex flex-col ${t.wbBg} ${
+            resizing ? 'pointer-events-none' : ''
+          }`}
+        >
           <div
             className={`flex items-center gap-2 px-4 py-2 border-b flex-shrink-0 ${t.panelBar}`}
           >
