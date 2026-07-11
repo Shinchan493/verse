@@ -109,6 +109,11 @@ export const registerRoomNamespace = (io: Server): void => {
       socket.to(roomId).emit('room:awareness', payload);
     });
 
+    // --- Media state (mic/cam on-off) so peers can show avatars, not black ---
+    socket.on('room:media', (payload: { camOn?: boolean; micOn?: boolean }) => {
+      socket.to(roomId).emit('room:media', { ...payload, id: socket.id });
+    });
+
     // --- Code execution results (relay so the whole room sees run output) ---
     socket.on('code:result', (payload: unknown) => {
       socket.to(roomId).emit('code:result', payload);

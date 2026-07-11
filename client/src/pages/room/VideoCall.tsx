@@ -9,6 +9,7 @@ import {
   UsersIcon,
   XIcon,
 } from '@heroicons/react/outline';
+import { colorForName } from './room-yjs';
 
 export type VideoMode = 'pill' | 'dock' | 'theater';
 
@@ -28,11 +29,15 @@ interface RemotePeer {
 const VideoTile = ({
   stream,
   label,
+  name,
+  cameraOff = false,
   className = 'w-32 h-20',
   onClick,
 }: {
   stream: MediaStream;
   label: string;
+  name: string;
+  cameraOff?: boolean;
   className?: string;
   onClick?: () => void;
 }) => {
@@ -56,6 +61,17 @@ const VideoTile = ({
         muted
         className="w-full h-full object-cover"
       />
+      {/* Camera off -> avatar instead of a black rectangle */}
+      {cameraOff && (
+        <div className="absolute inset-0 grid place-items-center bg-[#232327]">
+          <span
+            style={{ backgroundColor: colorForName(name) }}
+            className="w-1/3 max-w-[64px] min-w-[28px] aspect-square rounded-full grid place-items-center font-semibold text-white uppercase text-lg"
+          >
+            {name[0]}
+          </span>
+        </div>
+      )}
       <span className="absolute bottom-1 left-1.5 max-w-[80%] truncate text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">
         {label}
       </span>
@@ -105,11 +121,17 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
   const [camOn, setCamOn] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
+  // Peers' mic/cam state (relayed over the socket) — cams default to on.
+  const [remoteMedia, setRemoteMedia] = useState<
+    Record<string, { camOn?: boolean; micOn?: boolean }>
+  >({});
 
   const peersRef = useRef<Record<string, Peer.Instance>>({});
   const namesRef = useRef<Record<string, string>>({});
   const localStreamRef = useRef<MediaStream | null>(null);
   const offSocketRef = useRef<() => void>(() => {});
+  // Socket handlers are registered once; read current toggle state via a ref.
+  const mediaStateRef = useRef({ camOn: true, micOn: true });
 
   useEffect(() => {
     let cancelled = false;
@@ -161,10 +183,23 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
             if (!peersRef.current[p.id]) createPeer(p.id, true);
           });
         };
-        // A newcomer arrives -> we wait for their offer (non-initiator).
+        // A newcomer arrives -> we wait for their offer (non-initiator),
+        // and tell them our current mic/cam state.
         const onPeerJoined = (p: { id: string; name: string }) => {
           namesRef.current[p.id] = p.name;
           if (!peersRef.current[p.id]) createPeer(p.id, false);
+          socket.emit('room:media', mediaStateRef.current);
+        };
+        const onMedia = ({
+          id,
+          camOn,
+          micOn,
+        }: {
+          id: string;
+          camOn?: boolean;
+          micOn?: boolean;
+        }) => {
+          setRemoteMedia((prev) => ({ ...prev, [id]: { camOn, micOn } }));
         };
         const onSignal = ({
           from,
@@ -187,11 +222,13 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
         socket.on('room:peer-joined', onPeerJoined);
         socket.on('rtc:signal', onSignal);
         socket.on('room:peer-left', onPeerLeft);
+        socket.on('room:media', onMedia);
         offSocketRef.current = () => {
           socket.off('room:peers', onPeers);
           socket.off('room:peer-joined', onPeerJoined);
           socket.off('rtc:signal', onSignal);
           socket.off('room:peer-left', onPeerLeft);
+          socket.off('room:media', onMedia);
         };
 
         // Now that we're ready, ask who is already here.
@@ -226,6 +263,8 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
     if (track) {
       track.enabled = !track.enabled;
       setMicOn(track.enabled);
+      mediaStateRef.current = { ...mediaStateRef.current, micOn: track.enabled };
+      socket.emit('room:media', mediaStateRef.current);
     }
   };
   const toggleCam = () => {
@@ -233,6 +272,8 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
     if (track) {
       track.enabled = !track.enabled;
       setCamOn(track.enabled);
+      mediaStateRef.current = { ...mediaStateRef.current, camOn: track.enabled };
+      socket.emit('room:media', mediaStateRef.current);
     }
   };
 
@@ -242,9 +283,31 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
 
   // Everyone, self first. Audio sinks stay mounted in every mode so remote
   // voices keep playing even when tiles aren't visible (pill mode).
-  const tiles: { id: string; name: string; stream: MediaStream }[] = [
-    ...(localStream ? [{ id: 'me', name: `${me} (you)`, stream: localStream }] : []),
-    ...remotePeers,
+  const tiles: {
+    id: string;
+    name: string;
+    label: string;
+    stream: MediaStream;
+    cameraOff: boolean;
+  }[] = [
+    ...(localStream
+      ? [
+          {
+            id: 'me',
+            name: me,
+            label: `${me} (you)`,
+            stream: localStream,
+            cameraOff: !camOn,
+          },
+        ]
+      : []),
+    ...remotePeers.map((p) => ({
+      id: p.id,
+      name: p.name,
+      label: p.name,
+      stream: p.stream,
+      cameraOff: remoteMedia[p.id]?.camOn === false,
+    })),
   ];
   const audioSinks = remotePeers.map((p) => (
     <AudioSink key={p.id} stream={p.stream} />
@@ -299,7 +362,9 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
             {spotlight && (
               <VideoTile
                 stream={spotlight.stream}
-                label={spotlight.name}
+                label={spotlight.label}
+                name={spotlight.name}
+                cameraOff={spotlight.cameraOff}
                 className="w-full h-full max-h-full"
               />
             )}
@@ -311,7 +376,9 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
                 <VideoTile
                   key={t.id}
                   stream={t.stream}
-                  label={t.name}
+                  label={t.label}
+                  name={t.name}
+                  cameraOff={t.cameraOff}
                   className="w-full aspect-video"
                   onClick={() => setSpotlightId(t.id)}
                 />
@@ -339,7 +406,9 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
           <VideoTile
             key={t.id}
             stream={t.stream}
-            label={t.name}
+            label={t.label}
+            name={t.name}
+            cameraOff={t.cameraOff}
             className="w-44 h-28"
             onClick={() => {
               setSpotlightId(t.id);

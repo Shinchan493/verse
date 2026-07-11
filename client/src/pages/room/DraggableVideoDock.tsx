@@ -37,7 +37,7 @@ const DraggableVideoDock = ({
   const grabRef = useRef({ dx: 0, dy: 0 });
   const startRef = useRef({ x: 0, y: 0 });
   const movedRef = useRef(false);
-  const [corner, setCorner] = useState<Corner>('br');
+  const [corner, setCorner] = useState<Corner>('bl');
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 
   const rects = () => {
