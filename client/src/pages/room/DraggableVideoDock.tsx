@@ -112,31 +112,50 @@ const DraggableVideoDock = ({
     setDrag(null);
   };
 
-  if (asOverlay) {
-    // No chrome, no positioning — children (theater overlay) manage themselves.
-    return <div className="contents">{children}</div>;
-  }
-
+  // IMPORTANT: the element structure must be IDENTICAL in overlay and dock
+  // modes (only classes may change). A different tree would make React
+  // remount the children — restarting getUserMedia and the WebRTC peers,
+  // and resetting mic/cam state — on every mode switch. `display: contents`
+  // removes the wrapper boxes while keeping the children mounted. (The
+  // chrome's backdrop-blur must also go in overlay mode: backdrop-filter
+  // creates a containing block that would trap the fixed-position overlay.)
   return (
     <div
       ref={panelRef}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      style={drag ? { left: drag.x, top: drag.y } : undefined}
-      title={drag ? undefined : 'Drag to move — snaps to a corner'}
-      className={`absolute z-30 touch-none select-none ${
-        drag ? 'cursor-grabbing' : `cursor-grab ${CORNER_CLASS[corner]}`
-      }`}
+      onPointerDown={asOverlay ? undefined : onPointerDown}
+      onPointerMove={asOverlay ? undefined : onPointerMove}
+      onPointerUp={asOverlay ? undefined : onPointerUp}
+      style={!asOverlay && drag ? { left: drag.x, top: drag.y } : undefined}
+      title={asOverlay || drag ? undefined : 'Drag to move — snaps to a corner'}
+      className={
+        asOverlay
+          ? 'contents'
+          : `absolute z-30 touch-none select-none ${
+              drag ? 'cursor-grabbing' : `cursor-grab ${CORNER_CLASS[corner]}`
+            }`
+      }
     >
-      <div className="bg-[#1c1c1c]/90 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl pl-2 pr-3 py-2 flex items-center gap-2">
+      <div
+        className={
+          asOverlay
+            ? 'contents'
+            : 'bg-[#1c1c1c]/90 backdrop-blur-md border border-white/10 rounded-2xl shadow-2xl pl-2 pr-3 py-2 flex items-center gap-2'
+        }
+      >
         {/* Grip dots — the drag affordance */}
-        <div className="grid grid-cols-2 gap-0.5 flex-shrink-0" aria-hidden>
+        <div
+          className={`grid grid-cols-2 gap-0.5 flex-shrink-0 ${
+            asOverlay ? 'hidden' : ''
+          }`}
+          aria-hidden
+        >
           {Array.from({ length: 6 }).map((_, i) => (
             <span key={i} className="w-1 h-1 rounded-full bg-white/25" />
           ))}
         </div>
-        <div className="flex flex-col min-w-0">{children}</div>
+        <div className={asOverlay ? 'contents' : 'flex flex-col min-w-0'}>
+          {children}
+        </div>
       </div>
     </div>
   );

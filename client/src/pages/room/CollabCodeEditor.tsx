@@ -161,14 +161,11 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   const themeCompartmentRef = useRef(new Compartment());
   const ytextRef = useRef<Y.Text | null>(null);
   const langRef = useRef('JavaScript');
-  // The content is "pristine" while it's still just a template (or empty) —
-  // i.e. no user typing and no peer edit has happened. Only then do we swap
-  // templates on a language change.
-  const pristineRef = useRef(true);
   const [language, setLanguage] = useState('JavaScript');
 
   // --- Code execution + shared test cases ---
   const ytestsRef = useRef<Y.Array<TestCase> | null>(null);
+  const ymetaRef = useRef<Y.Map<string> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [tab, setTab] = useState<ConsoleTab>('output');
   const [running, setRunning] = useState(false);
@@ -180,12 +177,25 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   );
   const runnable = RUNNABLE.has(language);
 
+  // Content is still "just a starter" if it's empty or exactly matches one of
+  // the known templates — only then may a language switch replace it. Real
+  // code (anything hand-edited) is never clobbered.
+  const isStarterContent = (text: string) => {
+    const trimmed = text.trim();
+    return (
+      trimmed === '' ||
+      Object.values(TEMPLATES).some((tpl) => tpl.trim() === trimmed)
+    );
+  };
+
   const applyTemplate = (lang: string) => {
     const ytext = ytextRef.current;
     const doc = ytext?.doc;
-    if (!ytext || !doc || !pristineRef.current) return;
+    if (!ytext || !doc) return;
     const template = TEMPLATES[lang];
     if (!template) return;
+    const current = ytext.toString();
+    if (!isStarterContent(current) || current === template) return;
     doc.transact(() => {
       if (ytext.length > 0) ytext.delete(0, ytext.length);
       ytext.insert(0, template);
@@ -198,13 +208,6 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     const ydoc = new Y.Doc();
     const ytext = ydoc.getText('codemirror');
     ytextRef.current = ytext;
-
-    // Any change that isn't our own template insertion (user typing, a peer
-    // edit, or loading an existing room) marks the content as edited.
-    const onYTextChange = (_e: Y.YTextEvent, txn: Y.Transaction) => {
-      if (txn.origin !== 'template') pristineRef.current = false;
-    };
-    ytext.observe(onYTextChange);
 
     const awareness = new Awareness(ydoc);
     const color = colorForName(me);
@@ -222,6 +225,24 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     ytestsRef.current = ytests;
     const onTestsChange = () => setTests(ytests.toArray());
     ytests.observe(onTestsChange);
+
+    // The room's language selection is shared too (same doc, separate key) —
+    // when a peer switches language, everyone's editor follows. The content
+    // swap itself arrives through the code doc from whoever switched.
+    const ymeta = testsDoc.getMap<string>('meta');
+    ymetaRef.current = ymeta;
+    const onMetaChange = () => {
+      const lang = ymeta.get('language');
+      if (lang && LANGUAGES[lang] && lang !== langRef.current) {
+        setLanguage(lang);
+        langRef.current = lang;
+        viewRef.current?.dispatch({
+          effects: langCompartmentRef.current.reconfigure(LANGUAGES[lang]()),
+        });
+      }
+    };
+    ymeta.observe(onMetaChange);
+
     const unbindTests = bindYDocToRoom(socket, 'tests', testsDoc);
 
     // Run results are broadcast so the whole room sees the same console.
@@ -249,7 +270,11 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     const onCodeSync = ({ docKey }: { docKey: string }) => {
       if (docKey !== 'code' || templated) return;
       templated = true;
-      applyTemplate(langRef.current);
+      // Template only a truly fresh room. An existing room already has
+      // content (possibly another language's starter) — leave it alone.
+      if ((ytextRef.current?.toString().trim() ?? '') === '') {
+        applyTemplate(langRef.current);
+      }
     };
     socket.on('room:sync', onCodeSync);
 
@@ -271,8 +296,9 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     return () => {
       socket.off('room:sync', onCodeSync);
       socket.off('code:result', onCodeResult);
-      ytext.unobserve(onYTextChange);
       ytests.unobserve(onTestsChange);
+      ymeta.unobserve(onMetaChange);
+      ymetaRef.current = null;
       view.destroy();
       viewRef.current = null;
       unbind();
@@ -299,6 +325,7 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
       effects: langCompartmentRef.current.reconfigure(LANGUAGES[value]()),
     });
     applyTemplate(value);
+    ymetaRef.current?.set('language', value);
   };
 
   // --- Execution ---
