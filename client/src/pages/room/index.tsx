@@ -16,7 +16,7 @@ import { ToastContext } from '../../contexts/toast-context';
 import Wordmark from '../../components/atoms/wordmark';
 import CollabCodeEditor from './CollabCodeEditor';
 import Whiteboard from './Whiteboard';
-import VideoCall from './VideoCall';
+import VideoCall, { VideoMode } from './VideoCall';
 import DraggableVideoDock from './DraggableVideoDock';
 import PaneErrorBoundary from './PaneErrorBoundary';
 import { colorForName } from './room-yjs';
@@ -65,6 +65,7 @@ const Room = () => {
   const [showPeople, setShowPeople] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [theme, setTheme] = useState<Theme>('light');
+  const [videoMode, setVideoMode] = useState<VideoMode>('dock');
   const startRef = useRef(Date.now());
 
   // Resizable split between code editor and whiteboard (% width of code pane)
@@ -388,10 +389,22 @@ const Room = () => {
         </div>
 
         {/* Floating video call dock (kept dark in both themes) — draggable,
-            snaps to the nearest workspace corner */}
-        <DraggableVideoDock>
-          {socket && <VideoCall socket={socket} me={me} />}
-          {alone && (
+            snaps to a corner; minimizes to a pill; expands to theater view */}
+        <DraggableVideoDock
+          asOverlay={videoMode === 'theater'}
+          onBodyClick={
+            videoMode === 'pill' ? () => setVideoMode('dock') : undefined
+          }
+        >
+          {socket && (
+            <VideoCall
+              socket={socket}
+              me={me}
+              mode={videoMode}
+              onModeChange={setVideoMode}
+            />
+          )}
+          {alone && videoMode === 'dock' && (
             <p className="text-[11px] text-white/40 text-center pt-1.5">
               Waiting for others — share the invite link.
             </p>

@@ -4,11 +4,19 @@ import { Socket } from 'socket.io-client';
 import {
   MicrophoneIcon,
   VideoCameraIcon,
+  ArrowsExpandIcon,
+  MinusSmIcon,
+  UsersIcon,
+  XIcon,
 } from '@heroicons/react/outline';
+
+export type VideoMode = 'pill' | 'dock' | 'theater';
 
 interface VideoCallProps {
   socket: Socket;
   me: string;
+  mode: VideoMode;
+  onModeChange: (mode: VideoMode) => void;
 }
 
 interface RemotePeer {
@@ -20,23 +28,32 @@ interface RemotePeer {
 const VideoTile = ({
   stream,
   label,
-  muted,
+  className = 'w-32 h-20',
+  onClick,
 }: {
   stream: MediaStream;
   label: string;
-  muted?: boolean;
+  className?: string;
+  onClick?: () => void;
 }) => {
   const ref = useRef<HTMLVideoElement | null>(null);
   useEffect(() => {
     if (ref.current) ref.current.srcObject = stream;
   }, [stream]);
   return (
-    <div className="relative w-32 h-20 rounded-xl overflow-hidden bg-ink flex-shrink-0 ring-1 ring-black/5">
+    <div
+      onClick={onClick}
+      className={`relative rounded-xl overflow-hidden bg-ink flex-shrink-0 ring-1 ring-black/5 ${className} ${
+        onClick ? 'cursor-pointer hover:ring-2 hover:ring-white/30' : ''
+      }`}
+    >
+      {/* Video elements are always muted — audio plays via the persistent
+          AudioSink elements so it survives pill/theater mode switches. */}
       <video
         ref={ref}
         autoPlay
         playsInline
-        muted={muted}
+        muted
         className="w-full h-full object-cover"
       />
       <span className="absolute bottom-1 left-1.5 max-w-[80%] truncate text-[10px] font-medium text-white bg-black/50 px-1.5 py-0.5 rounded">
@@ -46,12 +63,48 @@ const VideoTile = ({
   );
 };
 
-const VideoCall = ({ socket, me }: VideoCallProps) => {
+// Invisible, always-mounted audio output for a remote stream.
+const AudioSink = ({ stream }: { stream: MediaStream }) => {
+  const ref = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.srcObject = stream;
+  }, [stream]);
+  return <audio ref={ref} autoPlay />;
+};
+
+const RoundButton = ({
+  onClick,
+  title,
+  active = true,
+  small = false,
+  children,
+}: {
+  onClick: () => void;
+  title: string;
+  active?: boolean;
+  small?: boolean;
+  children: React.ReactNode;
+}) => (
+  <button
+    onClick={onClick}
+    title={title}
+    className={`${
+      small ? 'w-7 h-7' : 'w-9 h-9'
+    } rounded-full grid place-items-center transition-colors flex-shrink-0 ${
+      active ? 'bg-white/10 hover:bg-white/20 text-white' : 'bg-red-600 text-white'
+    }`}
+  >
+    {children}
+  </button>
+);
+
+const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
   const [micOn, setMicOn] = useState(true);
   const [camOn, setCamOn] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [spotlightId, setSpotlightId] = useState<string | null>(null);
 
   const peersRef = useRef<Record<string, Peer.Instance>>({});
   const namesRef = useRef<Record<string, string>>({});
@@ -158,6 +211,16 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [socket]);
 
+  // Theater: Esc returns to the dock.
+  useEffect(() => {
+    if (mode !== 'theater') return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onModeChange('dock');
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [mode, onModeChange]);
+
   const toggleMic = () => {
     const track = localStream?.getAudioTracks()[0];
     if (track) {
@@ -173,44 +236,131 @@ const VideoCall = ({ socket, me }: VideoCallProps) => {
     }
   };
 
-  return (
-    <div className="flex items-center gap-2">
-      {error ? (
-        <span className="text-xs text-white/40 px-3 py-6">{error}</span>
-      ) : (
-        <>
-          {localStream && (
-            <VideoTile stream={localStream} label={`${me} (you)`} muted />
-          )}
-          {remotePeers.map((p) => (
-            <VideoTile key={p.id} stream={p.stream} label={p.name} />
-          ))}
-          <div className="flex items-center gap-1.5 pl-1">
-            <button
-              onClick={toggleMic}
-              title="Toggle microphone"
-              className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
-                micOn
-                  ? 'bg-white/10 hover:bg-white/20 text-white'
-                  : 'bg-red-600 text-white'
-              }`}
-            >
-              <MicrophoneIcon className="w-4 h-4" />
-            </button>
-            <button
-              onClick={toggleCam}
-              title="Toggle camera"
-              className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${
-                camOn
-                  ? 'bg-white/10 hover:bg-white/20 text-white'
-                  : 'bg-red-600 text-white'
-              }`}
-            >
-              <VideoCameraIcon className="w-4 h-4" />
-            </button>
+  if (error) {
+    return <span className="text-xs text-white/40 px-3 py-6">{error}</span>;
+  }
+
+  // Everyone, self first. Audio sinks stay mounted in every mode so remote
+  // voices keep playing even when tiles aren't visible (pill mode).
+  const tiles: { id: string; name: string; stream: MediaStream }[] = [
+    ...(localStream ? [{ id: 'me', name: `${me} (you)`, stream: localStream }] : []),
+    ...remotePeers,
+  ];
+  const audioSinks = remotePeers.map((p) => (
+    <AudioSink key={p.id} stream={p.stream} />
+  ));
+
+  const controls = (small = false) => (
+    <>
+      <RoundButton onClick={toggleMic} title="Toggle microphone" active={micOn} small={small}>
+        <MicrophoneIcon className="w-4 h-4" />
+      </RoundButton>
+      <RoundButton onClick={toggleCam} title="Toggle camera" active={camOn} small={small}>
+        <VideoCameraIcon className="w-4 h-4" />
+      </RoundButton>
+    </>
+  );
+
+  // --- Pill: tiny presence chip; click body to expand (handled by the dock) ---
+  if (mode === 'pill') {
+    return (
+      <div className="flex items-center gap-2 py-0.5" title="Click to expand">
+        {audioSinks}
+        <span className="flex items-center gap-1 text-xs text-white/70">
+          <UsersIcon className="w-4 h-4" />
+          {tiles.length}
+        </span>
+        {controls(true)}
+        <RoundButton
+          onClick={() => onModeChange('theater')}
+          title="Theater view"
+          small
+        >
+          <ArrowsExpandIcon className="w-3.5 h-3.5" />
+        </RoundButton>
+      </div>
+    );
+  }
+
+  // --- Theater: full-screen overlay, spotlight + filmstrip ---
+  if (mode === 'theater') {
+    const spotlight =
+      tiles.find((t) => t.id === spotlightId) ??
+      tiles.find((t) => t.id !== 'me') ??
+      tiles[0];
+    const rest = tiles.filter((t) => t.id !== spotlight?.id);
+
+    return (
+      <div className="fixed inset-0 z-50 bg-black/95 flex flex-col p-4 sm:p-6">
+        {audioSinks}
+        <div className="flex-1 flex gap-4 min-h-0">
+          {/* Spotlight */}
+          <div className="flex-1 min-w-0 grid place-items-center">
+            {spotlight && (
+              <VideoTile
+                stream={spotlight.stream}
+                label={spotlight.name}
+                className="w-full h-full max-h-full"
+              />
+            )}
           </div>
-        </>
-      )}
+          {/* Filmstrip */}
+          {rest.length > 0 && (
+            <div className="w-36 sm:w-44 flex flex-col gap-3 overflow-y-auto flex-shrink-0">
+              {rest.map((t) => (
+                <VideoTile
+                  key={t.id}
+                  stream={t.stream}
+                  label={t.name}
+                  className="w-full aspect-video"
+                  onClick={() => setSpotlightId(t.id)}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+        {/* Controls */}
+        <div className="flex items-center justify-center gap-2 pt-4 flex-shrink-0">
+          {controls()}
+          <RoundButton onClick={() => onModeChange('dock')} title="Exit theater (Esc)">
+            <XIcon className="w-4 h-4" />
+          </RoundButton>
+        </div>
+      </div>
+    );
+  }
+
+  // --- Dock: the floating panel — large tiles, slim control row below ---
+  return (
+    <div className="flex flex-col gap-2">
+      {audioSinks}
+      <div className="flex items-center gap-2">
+        {tiles.map((t) => (
+          <VideoTile
+            key={t.id}
+            stream={t.stream}
+            label={t.name}
+            className="w-44 h-28"
+            onClick={() => {
+              setSpotlightId(t.id);
+              onModeChange('theater');
+            }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-center gap-1.5">
+        {controls(true)}
+        <RoundButton
+          onClick={() => onModeChange('theater')}
+          title="Theater view"
+          small
+        >
+          <ArrowsExpandIcon className="w-3.5 h-3.5" />
+        </RoundButton>
+        <RoundButton onClick={() => onModeChange('pill')} title="Minimize" small>
+          <MinusSmIcon className="w-4 h-4" />
+        </RoundButton>
+      </div>
     </div>
   );
 };

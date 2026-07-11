@@ -10,15 +10,33 @@ const CORNER_CLASS: Record<Corner, string> = {
 };
 
 const EDGE_MARGIN = 8;
+const CLICK_SLOP_PX = 5;
+
+interface DraggableVideoDockProps {
+  children: ReactNode;
+  /** Render children without the floating chrome (used for theater mode,
+   *  which draws its own full-screen overlay). Keeps children mounted so
+   *  WebRTC streams survive mode switches. */
+  asOverlay?: boolean;
+  /** Fired when the panel body is clicked (a press that never became a
+   *  drag) — used to expand the minimized pill. */
+  onBodyClick?: () => void;
+}
 
 /**
  * Floating panel for the video call bar: drag it anywhere in the workspace
  * and it snaps to the nearest corner on release (Meet-style PiP). Uses
  * pointer capture so the drag stays smooth over the editor / whiteboard.
  */
-const DraggableVideoDock = ({ children }: { children: ReactNode }) => {
+const DraggableVideoDock = ({
+  children,
+  asOverlay = false,
+  onBodyClick,
+}: DraggableVideoDockProps) => {
   const panelRef = useRef<HTMLDivElement | null>(null);
   const grabRef = useRef({ dx: 0, dy: 0 });
+  const startRef = useRef({ x: 0, y: 0 });
+  const movedRef = useRef(false);
   const [corner, setCorner] = useState<Corner>('br');
   const [drag, setDrag] = useState<{ x: number; y: number } | null>(null);
 
@@ -41,6 +59,8 @@ const DraggableVideoDock = ({ children }: { children: ReactNode }) => {
       dx: e.clientX - r.panel.left,
       dy: e.clientY - r.panel.top,
     };
+    startRef.current = { x: e.clientX, y: e.clientY };
+    movedRef.current = false;
     panelRef.current!.setPointerCapture(e.pointerId);
     setDrag({
       x: r.panel.left - r.container.left,
@@ -50,6 +70,12 @@ const DraggableVideoDock = ({ children }: { children: ReactNode }) => {
 
   const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag) return;
+    if (
+      Math.abs(e.clientX - startRef.current.x) > CLICK_SLOP_PX ||
+      Math.abs(e.clientY - startRef.current.y) > CLICK_SLOP_PX
+    ) {
+      movedRef.current = true;
+    }
     const r = rects();
     if (!r) return;
     const x = e.clientX - r.container.left - grabRef.current.dx;
@@ -69,17 +95,27 @@ const DraggableVideoDock = ({ children }: { children: ReactNode }) => {
   const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!drag) return;
     panelRef.current?.releasePointerCapture(e.pointerId);
-    const r = rects();
-    if (r) {
-      // Snap to whichever corner the panel's center is closest to.
-      const cx = drag.x + r.panel.width / 2;
-      const cy = drag.y + r.panel.height / 2;
-      const vertical = cy < r.container.height / 2 ? 't' : 'b';
-      const horizontal = cx < r.container.width / 2 ? 'l' : 'r';
-      setCorner(`${vertical}${horizontal}` as Corner);
+    if (movedRef.current) {
+      const r = rects();
+      if (r) {
+        // Snap to whichever corner the panel's center is closest to.
+        const cx = drag.x + r.panel.width / 2;
+        const cy = drag.y + r.panel.height / 2;
+        const vertical = cy < r.container.height / 2 ? 't' : 'b';
+        const horizontal = cx < r.container.width / 2 ? 'l' : 'r';
+        setCorner(`${vertical}${horizontal}` as Corner);
+      }
+    } else {
+      // A press that never moved is a click on the panel body.
+      onBodyClick?.();
     }
     setDrag(null);
   };
+
+  if (asOverlay) {
+    // No chrome, no positioning — children (theater overlay) manage themselves.
+    return <div className="contents">{children}</div>;
+  }
 
   return (
     <div
