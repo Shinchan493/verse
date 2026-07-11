@@ -212,6 +212,9 @@ const Room = () => {
         </div>
 
         <div className="flex items-center gap-3 flex-shrink-0">
+          {/* Minimized video pill portals into this slot */}
+          <div id="video-pill-slot" className="flex items-center" />
+
           {/* Session timer */}
           <div
             className={`hidden sm:flex items-center gap-1.5 text-xs font-mono ${t.subtle}`}
@@ -389,13 +392,10 @@ const Room = () => {
         </div>
 
         {/* Floating video call dock (kept dark in both themes) — draggable,
-            snaps to a corner; minimizes to a pill; expands to theater view */}
-        <DraggableVideoDock
-          asOverlay={videoMode === 'theater'}
-          onBodyClick={
-            videoMode === 'pill' ? () => setVideoMode('dock') : undefined
-          }
-        >
+            snaps to a corner; minimizes to a header pill; expands to theater.
+            Pill and theater render their own UI (portal / fixed overlay), so
+            the dock chrome only shows in dock mode. */}
+        <DraggableVideoDock asOverlay={videoMode !== 'dock'}>
           {socket && (
             <VideoCall
               socket={socket}

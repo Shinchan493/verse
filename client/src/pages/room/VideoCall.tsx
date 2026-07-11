@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import Peer from 'simple-peer/simplepeer.min.js';
 import { Socket } from 'socket.io-client';
 import {
@@ -324,38 +325,51 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
     </>
   );
 
-  // --- Pill: tiny presence chip; click body to expand (handled by the dock) ---
+  let content: JSX.Element;
+
   if (mode === 'pill') {
-    return (
-      <div className="flex items-center gap-2 py-0.5" title="Click to expand">
-        {audioSinks}
+    // --- Pill: tiny presence chip, rendered into the header via a portal so
+    // it lives in the top bar instead of floating over the workspace. The
+    // component itself stays mounted here — streams and mic/cam state
+    // survive. Click the chip body to expand back to the dock. ---
+    const pill = (
+      <div
+        onClick={() => onModeChange('dock')}
+        title="Click to expand the video dock"
+        className="flex items-center gap-1.5 bg-[#1c1c1c]/90 border border-white/10 rounded-full pl-3 pr-1.5 py-1 cursor-pointer shadow-lg"
+      >
         <span className="flex items-center gap-1 text-xs text-white/70">
           <UsersIcon className="w-4 h-4" />
           {tiles.length}
         </span>
-        {controls(true)}
-        <RoundButton
-          onClick={() => onModeChange('theater')}
-          title="Theater view"
-          small
+        {/* Inner controls shouldn't also trigger the expand click */}
+        <div
+          className="flex items-center gap-1"
+          onClick={(e) => e.stopPropagation()}
         >
-          <ArrowsExpandIcon className="w-3.5 h-3.5" />
-        </RoundButton>
+          {controls(true)}
+          <RoundButton
+            onClick={() => onModeChange('theater')}
+            title="Theater view"
+            small
+          >
+            <ArrowsExpandIcon className="w-3.5 h-3.5" />
+          </RoundButton>
+        </div>
       </div>
     );
-  }
-
-  // --- Theater: full-screen overlay, spotlight + filmstrip ---
-  if (mode === 'theater') {
+    const slot = document.getElementById('video-pill-slot');
+    content = slot ? createPortal(pill, slot) : pill;
+  } else if (mode === 'theater') {
+    // --- Theater: full-screen overlay, spotlight + filmstrip ---
     const spotlight =
       tiles.find((t) => t.id === spotlightId) ??
       tiles.find((t) => t.id !== 'me') ??
       tiles[0];
     const rest = tiles.filter((t) => t.id !== spotlight?.id);
 
-    return (
+    content = (
       <div className="fixed inset-0 z-50 bg-black/95 flex flex-col p-4 sm:p-6">
-        {audioSinks}
         <div className="flex-1 flex gap-4 min-h-0">
           {/* Spotlight */}
           <div className="flex-1 min-w-0 grid place-items-center">
@@ -395,42 +409,50 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
         </div>
       </div>
     );
+  } else {
+    // --- Dock: the floating panel — large tiles, slim control row below ---
+    content = (
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center gap-2">
+          {tiles.map((t) => (
+            <VideoTile
+              key={t.id}
+              stream={t.stream}
+              label={t.label}
+              name={t.name}
+              cameraOff={t.cameraOff}
+              className="w-44 h-28"
+              onClick={() => {
+                setSpotlightId(t.id);
+                onModeChange('theater');
+              }}
+            />
+          ))}
+        </div>
+        <div className="flex items-center justify-center gap-1.5">
+          {controls(true)}
+          <RoundButton
+            onClick={() => onModeChange('theater')}
+            title="Theater view"
+            small
+          >
+            <ArrowsExpandIcon className="w-3.5 h-3.5" />
+          </RoundButton>
+          <RoundButton onClick={() => onModeChange('pill')} title="Minimize" small>
+            <MinusSmIcon className="w-4 h-4" />
+          </RoundButton>
+        </div>
+      </div>
+    );
   }
 
-  // --- Dock: the floating panel — large tiles, slim control row below ---
+  // Audio sinks render OUTSIDE the mode-specific content, in a stable slot,
+  // so remote audio elements survive every mode switch uninterrupted.
   return (
-    <div className="flex flex-col gap-2">
+    <>
       {audioSinks}
-      <div className="flex items-center gap-2">
-        {tiles.map((t) => (
-          <VideoTile
-            key={t.id}
-            stream={t.stream}
-            label={t.label}
-            name={t.name}
-            cameraOff={t.cameraOff}
-            className="w-44 h-28"
-            onClick={() => {
-              setSpotlightId(t.id);
-              onModeChange('theater');
-            }}
-          />
-        ))}
-      </div>
-      <div className="flex items-center justify-center gap-1.5">
-        {controls(true)}
-        <RoundButton
-          onClick={() => onModeChange('theater')}
-          title="Theater view"
-          small
-        >
-          <ArrowsExpandIcon className="w-3.5 h-3.5" />
-        </RoundButton>
-        <RoundButton onClick={() => onModeChange('pill')} title="Minimize" small>
-          <MinusSmIcon className="w-4 h-4" />
-        </RoundButton>
-      </div>
-    </div>
+      {content}
+    </>
   );
 };
 
