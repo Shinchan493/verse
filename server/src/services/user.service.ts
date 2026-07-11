@@ -74,7 +74,8 @@ class UserService {
   };
 
   public generateAuthResponse = async (
-    user: RequestUser | User
+    user: RequestUser | User,
+    previousRefreshToken?: string
   ): Promise<TokenPair> => {
     const requestUser = await this.getRequestUser(user);
 
@@ -85,10 +86,14 @@ class UserService {
       expiresIn: env.REFRESH_TOKEN_EXPIRATION,
     });
 
-    await RefreshToken.destroy({
-      where: { userId: requestUser.id },
-    });
+    // Store the new token BEFORE retiring the old one, and rotate only the
+    // token that was presented (not all of the user's sessions). If the
+    // server dies mid-refresh (e.g. a deploy), the client's old token is
+    // still active and the next refresh attempt succeeds — no forced logout.
     await RefreshToken.create({ token: refreshToken, userId: requestUser.id });
+    if (previousRefreshToken) {
+      await RefreshToken.destroy({ where: { token: previousRefreshToken } });
+    }
 
     return { accessToken, refreshToken };
   };

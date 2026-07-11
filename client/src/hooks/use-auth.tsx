@@ -47,7 +47,16 @@ const useAuth = () => {
         response.data;
       login(newAccessToken, newRefreshToken);
     } catch (error) {
-      destroyAuth();
+      // Only a definitive rejection (4xx) invalidates the session. On network
+      // errors or 5xx — e.g. the API is redeploying or cold-starting — keep
+      // the session and retry until the server is reachable again.
+      const status = (error as { response?: { status?: number } })?.response
+        ?.status;
+      if (status !== undefined && status < 500) {
+        destroyAuth();
+      } else {
+        setTimeout(refreshAccessToken, 15000);
+      }
     } finally {
       setLoadingAuth(false);
     }
@@ -64,9 +73,9 @@ const useAuth = () => {
   };
 
   const silentRefresh = (exp: number) => {
-    const msExpiration = Math.abs(
-      new Date().getTime() - new Date(exp * 1000).getTime()
-    );
+    // Refresh a minute before the access token expires (not at/after expiry)
+    // so requests never race an expired token.
+    const msExpiration = Math.max(exp * 1000 - Date.now() - 60_000, 0);
     setTimeout(() => {
       refreshAccessToken();
     }, msExpiration);

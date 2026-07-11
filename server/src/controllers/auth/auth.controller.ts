@@ -50,8 +50,11 @@ class AuthController {
           const { id, email, roles } = decoded as RequestUser;
           const user = { id, email, roles };
 
-          // issue new tokens
-          const authResponse = await userService.generateAuthResponse(user);
+          // issue new tokens, rotating out only the token that was presented
+          const authResponse = await userService.generateAuthResponse(
+            user,
+            refreshToken
+          );
           return res.status(200).json(authResponse);
         } catch (error) {
           console.log(error);
