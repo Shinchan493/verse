@@ -348,9 +348,11 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
           onClick={(e) => e.stopPropagation()}
         >
           {controls(true)}
+          {/* Restore the normal dock view — jumping straight to theater from
+              the pill was confusing */}
           <RoundButton
-            onClick={() => onModeChange('theater')}
-            title="Theater view"
+            onClick={() => onModeChange('dock')}
+            title="Show video dock"
             small
           >
             <ArrowsExpandIcon className="w-3.5 h-3.5" />
@@ -369,7 +371,7 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
     const rest = tiles.filter((t) => t.id !== spotlight?.id);
 
     content = (
-      <div className="fixed inset-0 z-50 bg-black/95 flex flex-col p-4 sm:p-6">
+      <div className="fixed inset-0 z-[100] bg-black/95 flex flex-col p-4 sm:p-6">
         <div className="flex-1 flex gap-4 min-h-0">
           {/* Spotlight */}
           <div className="flex-1 min-w-0 grid place-items-center">

@@ -9,6 +9,9 @@ import {
   UsersIcon,
   SunIcon,
   MoonIcon,
+  PauseIcon,
+  PlayIcon,
+  RefreshIcon,
 } from '@heroicons/react/outline';
 import { BASE_URL } from '../../services/api';
 import useAuth from '../../hooks/use-auth';
@@ -66,7 +69,10 @@ const Room = () => {
   const [elapsed, setElapsed] = useState(0);
   const [theme, setTheme] = useState<Theme>('light');
   const [videoMode, setVideoMode] = useState<VideoMode>('dock');
+  const [timerRunning, setTimerRunning] = useState(true);
   const startRef = useRef(Date.now());
+  // Seconds accumulated across previous run stretches (pause support).
+  const timerBaseRef = useRef(0);
 
   // Resizable split between code editor and whiteboard (% width of code pane)
   const DEFAULT_SPLIT = 57;
@@ -136,12 +142,33 @@ const Room = () => {
       };
 
   useEffect(() => {
+    if (!timerRunning) return;
     const timer = setInterval(
-      () => setElapsed(Math.floor((Date.now() - startRef.current) / 1000)),
+      () =>
+        setElapsed(
+          timerBaseRef.current +
+            Math.floor((Date.now() - startRef.current) / 1000)
+        ),
       1000
     );
     return () => clearInterval(timer);
-  }, []);
+  }, [timerRunning]);
+
+  const toggleTimer = () => {
+    if (timerRunning) {
+      timerBaseRef.current +=
+        Math.floor((Date.now() - startRef.current) / 1000);
+    } else {
+      startRef.current = Date.now();
+    }
+    setTimerRunning(!timerRunning);
+  };
+
+  const resetTimer = () => {
+    timerBaseRef.current = 0;
+    startRef.current = Date.now();
+    setElapsed(0);
+  };
 
   useEffect(() => {
     if (!roomId || !accessToken) return;
@@ -187,7 +214,7 @@ const Room = () => {
     >
       {/* Top bar */}
       <header
-        className={`flex items-center justify-between gap-4 px-5 py-2.5 border-b flex-shrink-0 ${t.header}`}
+        className={`flex items-center justify-between gap-4 px-4 py-1.5 border-b flex-shrink-0 ${t.header}`}
       >
         <div className="flex items-center gap-4 min-w-0">
           <Wordmark to="/document/create" size="sm" invert={dark} />
@@ -204,7 +231,7 @@ const Room = () => {
           <button
             onClick={copyLink}
             title="Copy invite link"
-            className={`hidden md:flex items-center gap-2 border rounded-full pl-3 pr-2 py-1.5 transition-colors ${t.pill}`}
+            className={`hidden md:flex items-center gap-2 border rounded-full pl-3 pr-2 py-1 transition-colors ${t.pill}`}
           >
             <span className={`font-mono text-xs ${t.pillText}`}>{roomId}</span>
             <ClipboardCopyIcon className={`w-4 h-4 ${t.pillIcon}`} />
@@ -215,19 +242,39 @@ const Room = () => {
           {/* Minimized video pill portals into this slot */}
           <div id="video-pill-slot" className="flex items-center" />
 
-          {/* Session timer */}
+          {/* Session timer with pause / reset */}
           <div
-            className={`hidden sm:flex items-center gap-1.5 text-xs font-mono ${t.subtle}`}
+            className={`hidden sm:flex items-center gap-0.5 text-xs font-mono ${t.subtle}`}
           >
-            <ClockIcon className="w-4 h-4" />
-            {fmt(elapsed)}
+            <ClockIcon className="w-4 h-4 mr-1" />
+            <span className={timerRunning ? '' : 'opacity-60'}>
+              {fmt(elapsed)}
+            </span>
+            <button
+              onClick={toggleTimer}
+              title={timerRunning ? 'Pause timer' : 'Resume timer'}
+              className={`w-6 h-6 rounded-full grid place-items-center transition-colors ${t.hover}`}
+            >
+              {timerRunning ? (
+                <PauseIcon className="w-3.5 h-3.5" />
+              ) : (
+                <PlayIcon className="w-3.5 h-3.5" />
+              )}
+            </button>
+            <button
+              onClick={resetTimer}
+              title="Reset timer"
+              className={`w-6 h-6 rounded-full grid place-items-center transition-colors ${t.hover}`}
+            >
+              <RefreshIcon className="w-3.5 h-3.5" />
+            </button>
           </div>
 
           {/* Theme toggle */}
           <button
             onClick={() => setTheme(dark ? 'light' : 'dark')}
             title={dark ? 'Switch to light mode' : 'Switch to dark mode'}
-            className={`w-9 h-9 rounded-full grid place-items-center transition-colors ${t.toggle}`}
+            className={`w-8 h-8 rounded-full grid place-items-center transition-colors ${t.toggle}`}
           >
             {dark ? (
               <SunIcon className="w-4 h-4" />
@@ -289,7 +336,7 @@ const Room = () => {
 
           <button
             onClick={() => navigate('/document/create')}
-            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 px-3.5 py-1.5 rounded-full transition-colors"
+            className="inline-flex items-center gap-1.5 text-sm font-semibold text-white bg-red-600 hover:bg-red-700 px-3 py-1 rounded-full transition-colors"
           >
             <LogoutIcon className="w-4 h-4" />
             Leave
@@ -360,9 +407,10 @@ const Room = () => {
           </div>
         </div>
 
-        {/* Whiteboard */}
+        {/* Whiteboard — `isolate` contains tldraw's high z-index toolbars in
+            their own stacking context so they can't overlap the theater view */}
         <div
-          className={`flex-1 min-w-0 h-full flex flex-col ${t.wbBg} ${
+          className={`flex-1 min-w-0 h-full flex flex-col isolate ${t.wbBg} ${
             resizing ? 'pointer-events-none' : ''
           }`}
         >
