@@ -3,6 +3,7 @@ import { authenticate, authorize } from '../middleware/auth';
 import user from './user.route';
 import auth from './auth.route';
 import document from './document.route';
+import code from './code.route';
 import RoleEnum from '../types/enums/role-enum';
 
 const router = Router();
@@ -17,5 +18,6 @@ router.get(
 router.use('/user', user);
 router.use('/auth', auth);
 router.use('/document', document);
+router.use('/code', code);
 
 export default router;

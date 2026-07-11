@@ -19,6 +19,7 @@ Verse lets teams create together in the same moment: write documents with live c
 ### 🟢 Live Sessions
 - Join-by-link rooms for pair programming, interviews, and teaching
 - **Collaborative code editor** (CodeMirror 6) with language selection, shared cursors, and starter templates
+- **Run code** (JavaScript, TypeScript, Python, C/C++) via paiza.io with room-wide shared output — plus **test cases** (stdin → expected stdout) everyone can edit and run
 - **Collaborative whiteboard** (tldraw) to sketch and explain
 - **Peer-to-peer video & audio** (WebRTC) with mic/cam controls
 - **Dark / light** session theme, participant list, session timer

@@ -13,7 +13,16 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { yCollab } from 'y-codemirror.next';
+import { PlayIcon, TerminalIcon } from '@heroicons/react/outline';
 import { bindYDocToRoom, colorForName } from './room-yjs';
+import useAuth from '../../hooks/use-auth';
+import CodeService from '../../services/code-service';
+import CodeConsole, {
+  ConsoleTab,
+  RunOutput,
+  TestCase,
+  TestResult,
+} from './CodeConsole';
 
 type Theme = 'dark' | 'light';
 
@@ -31,6 +40,15 @@ const LANGUAGES: Record<string, () => any> = {
   HTML: () => html(),
   CSS: () => css(),
 };
+
+// Languages the backend can execute (via Piston); HTML/CSS are markup-only.
+const RUNNABLE = new Set(['JavaScript', 'TypeScript', 'Python', 'C / C++']);
+
+const uid = () => Math.random().toString(36).slice(2, 10);
+
+const errorMessage = (err: unknown): string =>
+  (err as any)?.response?.data?.errors?.[0]?.msg ??
+  'Execution failed — try again.';
 
 // Minimal starter snippets so a fresh room isn't a blank page.
 const TEMPLATES: Record<string, string> = {
@@ -136,6 +154,7 @@ const themeExtension = (theme: Theme) =>
 
 const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   const dark = theme === 'dark';
+  const { accessToken } = useAuth();
   const parentRef = useRef<HTMLDivElement | null>(null);
   const viewRef = useRef<EditorView | null>(null);
   const langCompartmentRef = useRef(new Compartment());
@@ -147,6 +166,19 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   // templates on a language change.
   const pristineRef = useRef(true);
   const [language, setLanguage] = useState('JavaScript');
+
+  // --- Code execution + shared test cases ---
+  const ytestsRef = useRef<Y.Array<TestCase> | null>(null);
+  const [panelOpen, setPanelOpen] = useState(false);
+  const [tab, setTab] = useState<ConsoleTab>('output');
+  const [running, setRunning] = useState(false);
+  const [output, setOutput] = useState<RunOutput | null>(null);
+  const [tests, setTests] = useState<TestCase[]>([]);
+  const [testsRunning, setTestsRunning] = useState(false);
+  const [testResults, setTestResults] = useState<Record<string, TestResult>>(
+    {}
+  );
+  const runnable = RUNNABLE.has(language);
 
   const applyTemplate = (lang: string) => {
     const ytext = ytextRef.current;
@@ -184,6 +216,35 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
 
     const unbind = bindYDocToRoom(socket, 'code', ydoc, awareness);
 
+    // Shared test cases live in their own Yjs doc so everyone edits one list.
+    const testsDoc = new Y.Doc();
+    const ytests = testsDoc.getArray<TestCase>('tests');
+    ytestsRef.current = ytests;
+    const onTestsChange = () => setTests(ytests.toArray());
+    ytests.observe(onTestsChange);
+    const unbindTests = bindYDocToRoom(socket, 'tests', testsDoc);
+
+    // Run results are broadcast so the whole room sees the same console.
+    const onCodeResult = (payload: {
+      kind: 'run' | 'tests';
+      output?: RunOutput;
+      results?: TestResult[];
+    }) => {
+      if (payload?.kind === 'run' && payload.output) {
+        setOutput(payload.output);
+        setRunning(false);
+        setPanelOpen(true);
+        setTab('output');
+      } else if (payload?.kind === 'tests' && payload.results) {
+        setTestResults(
+          Object.fromEntries(payload.results.map((r) => [r.id, r]))
+        );
+        setPanelOpen(true);
+        setTab('tests');
+      }
+    };
+    socket.on('code:result', onCodeResult);
+
     let templated = false;
     const onCodeSync = ({ docKey }: { docKey: string }) => {
       if (docKey !== 'code' || templated) return;
@@ -209,10 +270,15 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
 
     return () => {
       socket.off('room:sync', onCodeSync);
+      socket.off('code:result', onCodeResult);
       ytext.unobserve(onYTextChange);
+      ytests.unobserve(onTestsChange);
       view.destroy();
       viewRef.current = null;
       unbind();
+      unbindTests();
+      ytestsRef.current = null;
+      testsDoc.destroy();
       awareness.destroy();
       ydoc.destroy();
     };
@@ -235,6 +301,101 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     applyTemplate(value);
   };
 
+  // --- Execution ---
+
+  const runCode = async () => {
+    if (!runnable || running || !accessToken) return;
+    setPanelOpen(true);
+    setTab('output');
+    setRunning(true);
+    const result: RunOutput = { by: me, language };
+    try {
+      const res = await CodeService.execute(accessToken, {
+        language,
+        code: ytextRef.current?.toString() ?? '',
+      });
+      Object.assign(result, res.data);
+    } catch (err) {
+      result.error = errorMessage(err);
+    }
+    setOutput(result);
+    setRunning(false);
+    socket.emit('code:result', { kind: 'run', output: result });
+  };
+
+  const normalize = (s: string) => s.replace(/\r\n/g, '\n').trim();
+
+  const runTests = async () => {
+    const list = ytestsRef.current?.toArray() ?? [];
+    if (!runnable || testsRunning || !accessToken || list.length === 0) return;
+    setPanelOpen(true);
+    setTab('tests');
+    setTestsRunning(true);
+    const code = ytextRef.current?.toString() ?? '';
+    const results: Record<string, TestResult> = {};
+    list.forEach((tc) => {
+      results[tc.id] = { id: tc.id, status: 'running' };
+    });
+    setTestResults({ ...results });
+
+    for (const tc of list) {
+      try {
+        const res = await CodeService.execute(accessToken, {
+          language,
+          code,
+          stdin: tc.input,
+        });
+        const d = res.data;
+        if (d.exitCode !== 0) {
+          results[tc.id] = {
+            id: tc.id,
+            status: 'error',
+            actual: (d.compileOutput || d.stderr || 'Runtime error').trim(),
+          };
+        } else {
+          results[tc.id] = {
+            id: tc.id,
+            status:
+              normalize(d.stdout ?? '') === normalize(tc.expected)
+                ? 'pass'
+                : 'fail',
+            actual: (d.stdout ?? '').trim(),
+          };
+        }
+      } catch (err) {
+        results[tc.id] = { id: tc.id, status: 'error', actual: errorMessage(err) };
+      }
+      setTestResults({ ...results });
+      // Space out requests: the server enforces a per-user cooldown.
+      await new Promise((resolve) => setTimeout(resolve, 650));
+    }
+
+    setTestsRunning(false);
+    socket.emit('code:result', { kind: 'tests', results: Object.values(results) });
+  };
+
+  // --- Shared test-case CRUD (mutate the Yjs array so peers stay in sync) ---
+
+  const addTest = () =>
+    ytestsRef.current?.push([{ id: uid(), input: '', expected: '' }]);
+
+  const updateTest = (index: number, patch: Partial<TestCase>) => {
+    const ytests = ytestsRef.current;
+    const doc = ytests?.doc;
+    if (!ytests || !doc || index >= ytests.length) return;
+    const current = ytests.get(index);
+    doc.transact(() => {
+      ytests.delete(index, 1);
+      ytests.insert(index, [{ ...current, ...patch }]);
+    });
+  };
+
+  const removeTest = (index: number) => {
+    const ytests = ytestsRef.current;
+    if (!ytests || index >= ytests.length) return;
+    ytests.delete(index, 1);
+  };
+
   return (
     <div className={`flex flex-col h-full ${dark ? 'bg-[#131316]' : 'bg-white'}`}>
       <div
@@ -249,23 +410,71 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
         >
           Code
         </span>
-        <select
-          value={language}
-          onChange={(e) => handleLanguageChange(e.target.value)}
-          className={`text-xs rounded-md px-2 py-1 border focus:outline-none ${
-            dark
-              ? 'bg-[#1c1c1f] text-white/80 border-white/10'
-              : 'bg-white text-ink border-paper-2'
-          }`}
-        >
-          {Object.keys(LANGUAGES).map((lang) => (
-            <option key={lang} value={lang}>
-              {lang}
-            </option>
-          ))}
-        </select>
+        <div className="flex items-center gap-2">
+          <select
+            value={language}
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className={`text-xs rounded-md px-2 py-1 border focus:outline-none ${
+              dark
+                ? 'bg-[#1c1c1f] text-white/80 border-white/10'
+                : 'bg-white text-ink border-paper-2'
+            }`}
+          >
+            {Object.keys(LANGUAGES).map((lang) => (
+              <option key={lang} value={lang}>
+                {lang}
+              </option>
+            ))}
+          </select>
+          <button
+            onClick={() => setPanelOpen((v) => !v)}
+            title={panelOpen ? 'Hide console' : 'Show console'}
+            className={`p-1.5 rounded-md transition-colors ${
+              dark
+                ? 'text-white/60 hover:bg-white/10'
+                : 'text-ink-soft hover:bg-paper-2'
+            } ${panelOpen ? (dark ? 'bg-white/10' : 'bg-paper-2') : ''}`}
+          >
+            <TerminalIcon className="w-4 h-4" />
+          </button>
+          <button
+            onClick={runCode}
+            disabled={!runnable || running}
+            title={
+              runnable
+                ? 'Run the code (everyone sees the output)'
+                : `${language} cannot be executed`
+            }
+            className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-md pl-2 pr-2.5 py-1 transition-colors"
+          >
+            {running ? (
+              <span className="w-3 h-3 inline-block rounded-full border-2 border-current border-t-transparent animate-spin" />
+            ) : (
+              <PlayIcon className="w-3.5 h-3.5" />
+            )}
+            Run
+          </button>
+        </div>
       </div>
       <div ref={parentRef} className="flex-1 overflow-hidden" />
+      {panelOpen && (
+        <CodeConsole
+          theme={theme}
+          tab={tab}
+          setTab={setTab}
+          running={running}
+          output={output}
+          tests={tests}
+          testResults={testResults}
+          testsRunning={testsRunning}
+          runnable={runnable}
+          onRunTests={runTests}
+          onAddTest={addTest}
+          onUpdateTest={updateTest}
+          onRemoveTest={removeTest}
+          onClose={() => setPanelOpen(false)}
+        />
+      )}
     </div>
   );
 };

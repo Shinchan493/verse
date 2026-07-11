@@ -109,6 +109,11 @@ export const registerRoomNamespace = (io: Server): void => {
       socket.to(roomId).emit('room:awareness', payload);
     });
 
+    // --- Code execution results (relay so the whole room sees run output) ---
+    socket.on('code:result', (payload: unknown) => {
+      socket.to(roomId).emit('code:result', payload);
+    });
+
     // --- WebRTC signaling passthrough (peer-to-peer video/audio) ---
     socket.on('rtc:signal', ({ to, signal }: { to: string; signal: unknown }) => {
       nsp.to(to).emit('rtc:signal', { from: socket.id, signal });
