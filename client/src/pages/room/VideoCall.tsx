@@ -89,6 +89,24 @@ const AudioSink = ({ stream }: { stream: MediaStream }) => {
   return <audio ref={ref} autoPlay />;
 };
 
+// Diagonal strike over an icon — the universal "this is off" mark.
+const Struck = ({
+  off,
+  children,
+}: {
+  off: boolean;
+  children: React.ReactNode;
+}) => (
+  <span className="relative grid place-items-center">
+    {children}
+    <span
+      className={`absolute h-[1.5px] bg-white rounded-full rotate-45 transition-all duration-200 ${
+        off ? 'w-[135%] opacity-100' : 'w-0 opacity-0'
+      }`}
+    />
+  </span>
+);
+
 const RoundButton = ({
   onClick,
   title,
@@ -118,11 +136,12 @@ const RoundButton = ({
 const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [remotePeers, setRemotePeers] = useState<RemotePeer[]>([]);
-  const [micOn, setMicOn] = useState(true);
-  const [camOn, setCamOn] = useState(true);
+  // Join muted with camera off — nobody should broadcast before they choose to.
+  const [micOn, setMicOn] = useState(false);
+  const [camOn, setCamOn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [spotlightId, setSpotlightId] = useState<string | null>(null);
-  // Peers' mic/cam state (relayed over the socket) — cams default to on.
+  // Peers' mic/cam state (relayed over the socket).
   const [remoteMedia, setRemoteMedia] = useState<
     Record<string, { camOn?: boolean; micOn?: boolean }>
   >({});
@@ -132,7 +151,7 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
   const localStreamRef = useRef<MediaStream | null>(null);
   const offSocketRef = useRef<() => void>(() => {});
   // Socket handlers are registered once; read current toggle state via a ref.
-  const mediaStateRef = useRef({ camOn: true, micOn: true });
+  const mediaStateRef = useRef({ camOn: false, micOn: false });
 
   useEffect(() => {
     let cancelled = false;
@@ -174,6 +193,9 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
           stream.getTracks().forEach((t) => t.stop());
           return;
         }
+        // Tracks stay acquired (so toggling on is instant and peers get them)
+        // but start disabled — muted mic, no video frames.
+        stream.getTracks().forEach((t) => (t.enabled = false));
         localStreamRef.current = stream;
         setLocalStream(stream);
 
@@ -232,8 +254,10 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
           socket.off('room:media', onMedia);
         };
 
-        // Now that we're ready, ask who is already here.
+        // Now that we're ready, ask who is already here and tell the room
+        // we're joining muted with the camera off.
         socket.emit('room:get-peers');
+        socket.emit('room:media', mediaStateRef.current);
       })
       .catch(() => {
         if (!cancelled) setError('Camera / microphone unavailable.');
@@ -316,11 +340,25 @@ const VideoCall = ({ socket, me, mode, onModeChange }: VideoCallProps) => {
 
   const controls = (small = false) => (
     <>
-      <RoundButton onClick={toggleMic} title="Toggle microphone" active={micOn} small={small}>
-        <MicrophoneIcon className="w-4 h-4" />
+      <RoundButton
+        onClick={toggleMic}
+        title={micOn ? 'Mute microphone' : 'Unmute microphone'}
+        active={micOn}
+        small={small}
+      >
+        <Struck off={!micOn}>
+          <MicrophoneIcon className="w-4 h-4" />
+        </Struck>
       </RoundButton>
-      <RoundButton onClick={toggleCam} title="Toggle camera" active={camOn} small={small}>
-        <VideoCameraIcon className="w-4 h-4" />
+      <RoundButton
+        onClick={toggleCam}
+        title={camOn ? 'Turn camera off' : 'Turn camera on'}
+        active={camOn}
+        small={small}
+      >
+        <Struck off={!camOn}>
+          <VideoCameraIcon className="w-4 h-4" />
+        </Struck>
       </RoundButton>
     </>
   );
