@@ -18,6 +18,12 @@ import { DocumentProvider } from './contexts/document-context';
 import Register from './pages/register';
 import VerifyEmail from './pages/user/verify-email';
 import ResetPassword from './pages/user/reset-password';
+import { BASE_URL } from './services/api';
+
+// Warm up the API the moment the app loads: if Render's free tier has spun
+// the server down, the cold start happens while the user is still looking at
+// the landing/login page instead of on their first real request.
+fetch(`${BASE_URL}health`).catch(() => {});
 
 const root = createRoot(document.getElementById('root') as HTMLElement);
 root.render(

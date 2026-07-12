@@ -7,6 +7,14 @@ import code from './code.route';
 import RoleEnum from '../types/enums/role-enum';
 
 const router = Router();
+
+// Unauthenticated liveness probe — used by the keep-alive pinger and the
+// client's boot-time warm-up so Render's free tier doesn't cold-start on
+// real users. Deliberately touches nothing (no DB).
+router.get('/health', (req: Request, res: Response) => {
+  return res.status(200).json({ ok: true, uptime: process.uptime() });
+});
+
 router.get(
   '/',
   authenticate,
