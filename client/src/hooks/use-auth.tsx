@@ -72,22 +72,28 @@ const useAuth = () => {
           response.data;
         login(newAccessToken, newRefreshToken);
       } catch (error) {
-        // Only a definitive rejection (4xx) invalidates the session. On
-        // network errors or 5xx — e.g. the API is redeploying or
-        // cold-starting — keep the session and retry until it's reachable.
         const status = (error as { response?: { status?: number } })?.response
           ?.status;
-        if (status !== undefined && status < 500) {
+        // Only an explicit rejection of THIS token ends the session. Anything
+        // else — network errors, 5xx, or infrastructure noise (Render serves
+        // 404/502/503 from its edge while a deploy swaps instances) — keeps
+        // the session and retries. Crucially, loadingAuth stays true during
+        // retries so AuthRoute keeps showing the loading state instead of
+        // bouncing a valid session to /login while the server restarts.
+        if (status === 400 || status === 401 || status === 403) {
           destroyAuth();
+          setLoadingAuth(false);
         } else {
-          setTimeout(() => {
+          if (refreshTimer) clearTimeout(refreshTimer);
+          refreshTimer = setTimeout(() => {
             refreshAccessToken();
-          }, 15000);
+          }, 5000);
         }
-      } finally {
-        setLoadingAuth(false);
         refreshInFlight = null;
+        return;
       }
+      setLoadingAuth(false);
+      refreshInFlight = null;
     };
 
     refreshInFlight = doRefresh();
