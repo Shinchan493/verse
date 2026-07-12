@@ -81,6 +81,15 @@ const useAuth = () => {
         // retries so AuthRoute keeps showing the loading state instead of
         // bouncing a valid session to /login while the server restarts.
         if (status === 400 || status === 401 || status === 403) {
+          // Multi-tab race: another tab may have rotated the token while our
+          // request was in flight (the rejection is about the OLD token). If
+          // localStorage now holds a different token, retry with that one
+          // instead of ending the session.
+          const current = readStoredRefreshToken();
+          if (current && current !== token) {
+            refreshInFlight = null;
+            return refreshAccessToken();
+          }
           destroyAuth();
           setLoadingAuth(false);
         } else {

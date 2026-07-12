@@ -1,6 +1,7 @@
 import { genSalt, hash, compare } from 'bcrypt';
 import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
+import { Op } from 'sequelize';
 import { User } from '../db/models/user.model';
 import { mailService } from './mail.service';
 import { RefreshToken } from '../db/models/refresh-token.model';
@@ -117,8 +118,22 @@ class UserService {
     // still active and the next refresh attempt succeeds — no forced logout.
     await RefreshToken.create({ token: refreshToken, userId: requestUser.id });
     if (previousRefreshToken) {
-      await RefreshToken.destroy({ where: { token: previousRefreshToken } });
+      // Grace window instead of immediate deletion: two tabs share one
+      // stored token and can refresh concurrently — the second request
+      // presents the just-rotated token and must not be rejected. If the
+      // server restarts before the timer fires, the old token lingers until
+      // the age sweep below (or its own JWT expiry) — harmless.
+      const retired = previousRefreshToken;
+      setTimeout(() => {
+        RefreshToken.destroy({ where: { token: retired } }).catch(() => {});
+      }, 60_000);
     }
+
+    // Sweep tokens that can no longer verify anyway (JWT lifetime is 7d).
+    const cutoff = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000);
+    RefreshToken.destroy({
+      where: { userId: requestUser.id, createdAt: { [Op.lt]: cutoff } },
+    }).catch(() => {});
 
     return { accessToken, refreshToken };
   };
