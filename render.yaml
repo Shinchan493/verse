@@ -61,6 +61,9 @@ services:
       # Set to the deployed frontend URL after first deploy (used for CORS + socket origin).
       - key: FRONT_END_URL
         sync: false
+      # Google OAuth client id (optional — Google sign-in is disabled without it).
+      - key: GOOGLE_CLIENT_ID
+        sync: false
 
   # --- Frontend (static CRA build) ---
   - type: web
@@ -72,6 +75,9 @@ services:
     envVars:
       # Set to the deployed API URL WITH a trailing slash, then redeploy.
       - key: REACT_APP_API_URL
+        sync: false
+      # Same Google OAuth client id as the API (optional — hides the button if unset).
+      - key: REACT_APP_GOOGLE_CLIENT_ID
         sync: false
     routes:
       - type: rewrite

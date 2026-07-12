@@ -14,6 +14,9 @@ const AuthService = {
   refreshToken: (payload: { token: string }) => {
     return API.post('auth/refresh-token', payload);
   },
+  googleLogin: (payload: { credential: string }) => {
+    return API.post('auth/google', payload);
+  },
   logout: (accessToken: string) => {
     return API.delete('auth/logout', {
       headers: { Authorization: `Bearer ${accessToken}` },
