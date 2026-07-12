@@ -1,4 +1,5 @@
 import { genSalt, hash, compare } from 'bcrypt';
+import { randomBytes } from 'crypto';
 import jwt from 'jsonwebtoken';
 import { User } from '../db/models/user.model';
 import { mailService } from './mail.service';
@@ -71,6 +72,30 @@ class UserService {
     password: string
   ): Promise<boolean> => {
     return await compare(password, user.password);
+  };
+
+  // Google sign-in: the email is already verified by Google, so the account
+  // is created verified, with an unguessable random password (the user can
+  // still set a real one later via the reset-password flow).
+  public findOrCreateGoogleUser = async (email: string): Promise<User> => {
+    const existing = await this.findUserByEmail(email);
+    if (existing) {
+      // A user who registered with email/password but never verified can
+      // still prove ownership of the address via Google.
+      if (!existing.isVerified) await this.updateIsVerified(existing, true);
+      return existing;
+    }
+
+    const salt = await genSalt();
+    const randomPassword = await hash(randomBytes(32).toString('hex'), salt);
+    const verificationToken = jwt.sign({ email }, env.VERIFY_EMAIL_SECRET);
+
+    return await User.create({
+      email,
+      password: randomPassword,
+      verificationToken,
+      isVerified: true,
+    });
   };
 
   public generateAuthResponse = async (

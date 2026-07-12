@@ -7,6 +7,8 @@ import Spinner from '../../components/atoms/spinner';
 import { Link, useNavigate } from 'react-router-dom';
 import axios, { AxiosError } from 'axios';
 import AuthService from '../../services/auth-service';
+import GoogleSignInButton from '../../components/molecules/google-signin-button';
+import useAuth from '../../hooks/use-auth';
 
 const Register = () => {
   const [email, setEmail] = useState('');
@@ -18,6 +20,24 @@ const Register = () => {
   const [password2Errors, setPassword2Errors] = useState<Array<string>>([]);
   const navigate = useNavigate();
   const { addToast, error } = useContext(ToastContext);
+  const { login } = useAuth();
+
+  // Google sign-up is instant: no email verification round trip needed.
+  const handleGoogleCredential = async (credential: string) => {
+    setLoading(true);
+    try {
+      const response = await AuthService.googleLogin({ credential });
+      const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+        response.data;
+      login(newAccessToken, newRefreshToken);
+      navigate('/document/create');
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.errors?.[0]?.msg;
+      error(msg ?? 'Google sign-up failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const validate = () => {
     setEmailErrors([]);
@@ -184,6 +204,11 @@ const Register = () => {
               {loading && <Spinner size="sm" />}
             </button>
           </div>
+
+          <GoogleSignInButton
+            onCredential={handleGoogleCredential}
+            text="signup_with"
+          />
 
           <p className="mt-8 text-sm text-ink-soft">
             Already have an account?{' '}

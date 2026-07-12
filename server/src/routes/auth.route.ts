@@ -5,6 +5,7 @@ import { authValidator } from '../validators/auth.validator';
 
 const router = Router();
 router.post('/login', authValidator.login, authController.login);
+router.post('/google', authController.googleLogin);
 router.post(
   '/refresh-token',
   authValidator.refreshToken,

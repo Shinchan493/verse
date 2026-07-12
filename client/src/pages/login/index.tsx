@@ -7,6 +7,7 @@ import Spinner from '../../components/atoms/spinner';
 import { Link, useNavigate } from 'react-router-dom';
 import useAuth from '../../hooks/use-auth';
 import AuthService from '../../services/auth-service';
+import GoogleSignInButton from '../../components/molecules/google-signin-button';
 import axios, { AxiosError } from 'axios';
 
 const Login = () => {
@@ -58,6 +59,23 @@ const Login = () => {
       } else {
         error('An unknown error has occured. Please try again.');
       }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGoogleCredential = async (credential: string) => {
+    setLoading(true);
+    try {
+      const response = await AuthService.googleLogin({ credential });
+      const { accessToken: newAccessToken, refreshToken: newRefreshToken } =
+        response.data;
+      login(newAccessToken, newRefreshToken);
+      success('Successfully logged in!');
+      navigate('/document/create');
+    } catch (err) {
+      const msg = (err as any)?.response?.data?.errors?.[0]?.msg;
+      error(msg ?? 'Google sign-in failed. Please try again.');
     } finally {
       setLoading(false);
     }
@@ -145,6 +163,11 @@ const Login = () => {
               {loading && <Spinner size="sm" />}
             </button>
           </div>
+
+          <GoogleSignInButton
+            onCredential={handleGoogleCredential}
+            text="signin_with"
+          />
 
           <p className="mt-8 text-sm text-ink-soft">
             New to Verse?{' '}

@@ -1,5 +1,6 @@
 import { validationResult } from 'express-validator';
 import { userService } from '../../services/user.service';
+import { verifyGoogleToken } from '../../services/google-auth.service';
 import jwt, { VerifyErrors } from 'jsonwebtoken';
 import catchAsync from '../../middleware/catch-async';
 import { Request, Response } from 'express';
@@ -26,6 +27,29 @@ class AuthController {
 
     const authResponse = await userService.generateAuthResponse(user);
     return res.status(200).json(authResponse);
+  });
+
+  // Google Sign-In: verify the GIS ID token, find-or-create the user, and
+  // issue the same access/refresh token pair as a password login.
+  public googleLogin = catchAsync(async (req: Request, res: Response) => {
+    const { credential } = req.body as { credential?: string };
+    if (!credential || typeof credential !== 'string') {
+      return res
+        .status(400)
+        .json({ errors: [{ msg: 'Missing Google credential.' }] });
+    }
+
+    try {
+      const googleUser = await verifyGoogleToken(credential);
+      const user = await userService.findOrCreateGoogleUser(googleUser.email);
+      const authResponse = await userService.generateAuthResponse(user);
+      return res.status(200).json(authResponse);
+    } catch (error) {
+      const status = (error as { status?: number }).status ?? 401;
+      const msg =
+        (error as Error).message || 'Google sign-in failed — try again.';
+      return res.status(status).json({ errors: [{ msg }] });
+    }
   });
 
   public refreshToken = catchAsync(async (req: Request, res: Response) => {

@@ -94,6 +94,10 @@ FRONT_END_URL=http://localhost:3000
 
 # Optional: skip email verification (users are verified on signup)
 AUTO_VERIFY_USERS=true
+
+# Optional: enable "Sign in with Google" (create an OAuth client in Google
+# Cloud Console; also set REACT_APP_GOOGLE_CLIENT_ID for the client)
+GOOGLE_CLIENT_ID=your-client-id.apps.googleusercontent.com
 ```
 
 Build and run (tables auto-create on first boot):
