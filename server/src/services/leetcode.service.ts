@@ -35,6 +35,8 @@ export interface ProblemData {
   snippets: Record<string, string>;
   examples: ProblemExample[];
   url: string;
+  /** Solution method name from metaData — used to auto-generate run drivers. */
+  functionName: string | null;
 }
 
 interface LCQuestion {
@@ -181,6 +183,14 @@ const fetchProblem = async (slug: string): Promise<ProblemData> => {
     expected: expected[i] ?? '',
   }));
 
+  let functionName: string | null = null;
+  try {
+    const meta = JSON.parse(q.metaData ?? '{}');
+    if (typeof meta.name === 'string' && meta.name) functionName = meta.name;
+  } catch {
+    // no driver support for this problem — runs still work manually
+  }
+
   const data: ProblemData = {
     slug,
     title: q.title,
@@ -190,6 +200,7 @@ const fetchProblem = async (slug: string): Promise<ProblemData> => {
     snippets,
     examples,
     url: `https://leetcode.com/problems/${slug}/`,
+    functionName,
   };
 
   cache.set(slug, { data, at: Date.now() });

@@ -18,6 +18,7 @@ import { bindYDocToRoom, colorForName } from './room-yjs';
 import useAuth from '../../hooks/use-auth';
 import CodeService from '../../services/code-service';
 import LeetcodeService, { ProblemData } from '../../services/leetcode-service';
+import { buildRunnableCode, driverSupported } from './drivers';
 import CodeConsole, {
   ConsoleTab,
   RunOutput,
@@ -186,22 +187,48 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
 
+  // --- Resizable console (drag the divider between editor and console) ---
+  const rootRef = useRef<HTMLDivElement | null>(null);
+  const [consoleHeight, setConsoleHeight] = useState(280);
+  const [consoleResizing, setConsoleResizing] = useState(false);
+
+  const onConsoleResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.currentTarget.setPointerCapture(e.pointerId);
+    setConsoleResizing(true);
+  };
+  const onConsoleResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!consoleResizing || !rootRef.current) return;
+    const rect = rootRef.current.getBoundingClientRect();
+    const h = rect.bottom - e.clientY;
+    setConsoleHeight(Math.min(Math.max(h, 140), rect.height - 120));
+  };
+  const onConsoleResizeUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId);
+    setConsoleResizing(false);
+  };
+
   // Content is still "just a starter" if it's empty or exactly matches one of
-  // the known templates — only then may a language switch replace it. Real
-  // code (anything hand-edited) is never clobbered.
+  // the known templates (built-in or the imported problem's snippets) — only
+  // then may a language switch replace it. Hand-edited code is never clobbered.
   const isStarterContent = (text: string) => {
     const trimmed = text.trim();
-    return (
-      trimmed === '' ||
-      Object.values(TEMPLATES).some((tpl) => tpl.trim() === trimmed)
-    );
+    if (trimmed === '') return true;
+    if (Object.values(TEMPLATES).some((tpl) => tpl.trim() === trimmed)) {
+      return true;
+    }
+    const snippets = problemRef.current?.snippets;
+    return snippets
+      ? Object.values(snippets).some((s) => s.trim() === trimmed)
+      : false;
   };
 
   const applyTemplate = (lang: string) => {
     const ytext = ytextRef.current;
     const doc = ytext?.doc;
     if (!ytext || !doc) return;
-    const template = TEMPLATES[lang];
+    // An imported problem's starter takes precedence over the built-ins.
+    const template = problemRef.current?.snippets[lang] ?? TEMPLATES[lang];
     if (!template) return;
     const current = ytext.toString();
     if (!isStarterContent(current) || current === template) return;
@@ -347,7 +374,17 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
 
   // --- Execution ---
 
-  const runCode = async () => {
+  // For imported problems, append the auto-driver that reads the test input,
+  // calls the Solution method, and prints the returned value — bridging
+  // LeetCode's return-based starters and our stdout-based judging.
+  const runnableCode = () =>
+    buildRunnableCode(
+      ytextRef.current?.toString() ?? '',
+      langRef.current,
+      problemRef.current
+    );
+
+  const runCode = async (stdin?: string) => {
     if (!runnable || running || !accessToken) return;
     setPanelOpen(true);
     setTab('output');
@@ -356,7 +393,8 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     try {
       const res = await CodeService.execute(accessToken, {
         language,
-        code: ytextRef.current?.toString() ?? '',
+        code: runnableCode(),
+        ...(stdin !== undefined ? { stdin } : {}),
       });
       Object.assign(result, res.data);
     } catch (err) {
@@ -367,6 +405,21 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     socket.emit('code:result', { kind: 'run', output: result });
   };
 
+  // Run = execute the code once (fed the first test's input, so imported
+  // problems show a meaningful result) and then run the whole test list.
+  const handleRun = async () => {
+    if (!runnable || running || testsRunning) return;
+    const first = ytestsRef.current?.length
+      ? ytestsRef.current.get(0)
+      : undefined;
+    await runCode(first?.input);
+    if (ytestsRef.current?.length) {
+      // Respect the server's per-user cooldown between the two phases.
+      await new Promise((resolve) => setTimeout(resolve, 650));
+      await runTests();
+    }
+  };
+
   const normalize = (s: string) => s.replace(/\r\n/g, '\n').trim();
 
   const runTests = async () => {
@@ -375,7 +428,7 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     setPanelOpen(true);
     setTab('tests');
     setTestsRunning(true);
-    const code = ytextRef.current?.toString() ?? '';
+    const code = runnableCode();
     const results: Record<string, TestResult> = {};
     list.forEach((tc) => {
       results[tc.id] = { id: tc.id, status: 'running' };
@@ -510,7 +563,10 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
   };
 
   return (
-    <div className={`flex flex-col h-full ${dark ? 'bg-[#131316]' : 'bg-white'}`}>
+    <div
+      ref={rootRef}
+      className={`flex flex-col h-full ${dark ? 'bg-[#131316]' : 'bg-white'}`}
+    >
       <div
         className={`flex items-center justify-between px-4 py-2 border-b flex-shrink-0 ${
           dark ? 'bg-[#0f0f0f] border-white/10' : 'bg-paper border-paper-2'
@@ -629,16 +685,16 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
             <TerminalIcon className="w-4 h-4" />
           </button>
           <button
-            onClick={runCode}
-            disabled={!runnable || running}
+            onClick={handleRun}
+            disabled={!runnable || running || testsRunning}
             title={
               runnable
-                ? 'Run the code (everyone sees the output)'
+                ? 'Run the code and all test cases (everyone sees the results)'
                 : `${language} cannot be executed`
             }
             className="flex items-center gap-1 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 disabled:cursor-not-allowed rounded-md pl-2 pr-2.5 py-1 transition-colors"
           >
-            {running ? (
+            {running || testsRunning ? (
               <span className="w-3 h-3 inline-block rounded-full border-2 border-current border-t-transparent animate-spin" />
             ) : (
               <PlayIcon className="w-3.5 h-3.5" />
@@ -647,25 +703,79 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
           </button>
         </div>
       </div>
-      <div ref={parentRef} className="flex-1 overflow-hidden" />
+      <div
+        ref={parentRef}
+        className={`flex-1 overflow-hidden ${
+          consoleResizing ? 'pointer-events-none' : ''
+        }`}
+      />
       {panelOpen && (
-        <CodeConsole
-          theme={theme}
-          tab={tab}
-          setTab={setTab}
-          running={running}
-          output={output}
-          tests={tests}
-          testResults={testResults}
-          testsRunning={testsRunning}
-          runnable={runnable}
-          problem={problem}
-          onRunTests={runTests}
-          onAddTest={addTest}
-          onUpdateTest={updateTest}
-          onRemoveTest={removeTest}
-          onClose={() => setPanelOpen(false)}
-        />
+        <>
+          {/* Drag to resize the console */}
+          <div
+            role="separator"
+            aria-orientation="horizontal"
+            title="Drag to resize the console"
+            onPointerDown={onConsoleResizeDown}
+            onPointerMove={onConsoleResizeMove}
+            onPointerUp={onConsoleResizeUp}
+            className={`h-1.5 flex-shrink-0 cursor-row-resize group flex items-center justify-center border-y transition-colors z-10 ${
+              dark ? 'border-white/10' : 'border-paper-2'
+            } ${
+              consoleResizing
+                ? 'bg-accent/40'
+                : dark
+                ? 'bg-[#0f0f0f] hover:bg-white/10'
+                : 'bg-paper hover:bg-paper-2'
+            }`}
+          >
+            <div
+              className={`flex gap-1 pointer-events-none ${
+                consoleResizing
+                  ? 'opacity-100'
+                  : 'opacity-40 group-hover:opacity-100'
+              }`}
+            >
+              {[0, 1, 2].map((i) => (
+                <span
+                  key={i}
+                  className={`w-1 h-1 rounded-full ${
+                    dark ? 'bg-white/60' : 'bg-ink-faint'
+                  }`}
+                />
+              ))}
+            </div>
+          </div>
+          <div
+            style={{ height: consoleHeight }}
+            className="flex-shrink-0 min-h-0 flex flex-col"
+          >
+            <CodeConsole
+              theme={theme}
+              tab={tab}
+              setTab={setTab}
+              running={running}
+              output={output}
+              tests={tests}
+              testResults={testResults}
+              testsRunning={testsRunning}
+              runnable={runnable}
+              problem={problem}
+              driverNote={
+                problem && problem.functionName
+                  ? driverSupported(language)
+                    ? `Runs auto-attach a driver that feeds each test's input to ${problem.functionName}() and prints the returned value.`
+                    : 'No auto-driver for C/C++ — write a main() that reads stdin and prints the result.'
+                  : null
+              }
+              onRunTests={runTests}
+              onAddTest={addTest}
+              onUpdateTest={updateTest}
+              onRemoveTest={removeTest}
+              onClose={() => setPanelOpen(false)}
+            />
+          </div>
+        </>
       )}
     </div>
   );

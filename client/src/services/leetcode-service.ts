@@ -15,6 +15,8 @@ export interface ProblemData {
   snippets: Record<string, string>;
   examples: ProblemExample[];
   url: string;
+  /** Solution method name — used to auto-generate run drivers. */
+  functionName: string | null;
 }
 
 const LeetcodeService = {

@@ -50,6 +50,7 @@ interface CodeConsoleProps {
   testsRunning: boolean;
   runnable: boolean;
   problem: ProblemData | null;
+  driverNote: string | null;
   onRunTests: () => void;
   onAddTest: () => void;
   onUpdateTest: (index: number, patch: Partial<TestCase>) => void;
@@ -87,6 +88,7 @@ const CodeConsole = ({
   testsRunning,
   runnable,
   problem,
+  driverNote,
   onRunTests,
   onAddTest,
   onUpdateTest,
@@ -140,7 +142,7 @@ const CodeConsole = ({
   );
 
   return (
-    <div className={`h-2/5 min-h-[190px] border-t flex flex-col flex-shrink-0 ${t.root}`}>
+    <div className={`h-full flex flex-col ${t.root}`}>
       {/* Tab bar */}
       <div
         className={`flex items-center gap-1 px-3 border-b flex-shrink-0 ${t.tabBar}`}
@@ -285,6 +287,10 @@ const CodeConsole = ({
                 Run tests
               </button>
             </div>
+
+            {driverNote && (
+              <p className={`text-[11px] ${t.subtle}`}>{driverNote}</p>
+            )}
 
             {tests.length === 0 && (
               <p className={`text-xs ${t.subtle}`}>
