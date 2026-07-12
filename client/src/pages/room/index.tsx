@@ -67,12 +67,18 @@ const Room = () => {
   const [participants, setParticipants] = useState<Participant[]>([]);
   const [showPeople, setShowPeople] = useState(false);
   const [elapsed, setElapsed] = useState(0);
-  const [theme, setTheme] = useState<Theme>('light');
+  const [theme, setTheme] = useState<Theme>('dark');
   const [videoMode, setVideoMode] = useState<VideoMode>('dock');
-  const [timerRunning, setTimerRunning] = useState(true);
-  const startRef = useRef(Date.now());
-  // Seconds accumulated across previous run stretches (pause support).
-  const timerBaseRef = useRef(0);
+  // Server-authoritative room timer (shared by everyone in the session).
+  // `offset` corrects for the difference between this client's clock and
+  // the server's, so all participants render the same elapsed time.
+  const [timerState, setTimerState] = useState<{
+    startedAt: number;
+    accumulated: number;
+    running: boolean;
+    offset: number;
+  } | null>(null);
+  const timerRunning = timerState?.running ?? true;
 
   // Resizable split between code editor and whiteboard (% width of code pane)
   const DEFAULT_SPLIT = 57;
@@ -142,33 +148,22 @@ const Room = () => {
       };
 
   useEffect(() => {
-    if (!timerRunning) return;
-    const timer = setInterval(
-      () =>
-        setElapsed(
-          timerBaseRef.current +
-            Math.floor((Date.now() - startRef.current) / 1000)
-        ),
-      1000
-    );
+    if (!timerState) return;
+    const compute = () => {
+      const { accumulated, running, startedAt, offset } = timerState;
+      const seconds =
+        accumulated + (running ? (Date.now() + offset - startedAt) / 1000 : 0);
+      setElapsed(Math.max(0, Math.floor(seconds)));
+    };
+    compute();
+    if (!timerState.running) return;
+    const timer = setInterval(compute, 1000);
     return () => clearInterval(timer);
-  }, [timerRunning]);
+  }, [timerState]);
 
-  const toggleTimer = () => {
-    if (timerRunning) {
-      timerBaseRef.current +=
-        Math.floor((Date.now() - startRef.current) / 1000);
-    } else {
-      startRef.current = Date.now();
-    }
-    setTimerRunning(!timerRunning);
-  };
-
-  const resetTimer = () => {
-    timerBaseRef.current = 0;
-    startRef.current = Date.now();
-    setElapsed(0);
-  };
+  // Pause/reset act on the room's shared timer via the server.
+  const toggleTimer = () => socket?.emit('timer:toggle');
+  const resetTimer = () => socket?.emit('timer:reset');
 
   useEffect(() => {
     if (!roomId || !accessToken) return;
@@ -184,10 +179,23 @@ const Room = () => {
       );
     const onLeft = ({ id }: { id: string }) =>
       setParticipants((prev) => prev.filter((x) => x.id !== id));
+    const onTimer = (t: {
+      startedAt: number;
+      accumulated: number;
+      running: boolean;
+      serverNow: number;
+    }) =>
+      setTimerState({
+        startedAt: t.startedAt,
+        accumulated: t.accumulated,
+        running: t.running,
+        offset: t.serverNow - Date.now(),
+      });
 
     s.on('room:peers', onPeers);
     s.on('room:peer-joined', onJoined);
     s.on('room:peer-left', onLeft);
+    s.on('room:timer', onTimer);
 
     setSocket(s);
 
@@ -195,6 +203,7 @@ const Room = () => {
       s.off('room:peers', onPeers);
       s.off('room:peer-joined', onJoined);
       s.off('room:peer-left', onLeft);
+      s.off('room:timer', onTimer);
       s.disconnect();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

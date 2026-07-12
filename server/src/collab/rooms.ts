@@ -15,8 +15,15 @@ import * as Y from 'yjs';
 import jwt from 'jsonwebtoken';
 import env from '../config/env.config';
 
+interface RoomTimer {
+  startedAt: number; // server epoch ms of the current running stretch
+  accumulated: number; // seconds accumulated across previous stretches
+  running: boolean;
+}
+
 interface RoomState {
   docs: Map<string, Y.Doc>;
+  timer: RoomTimer;
 }
 
 const rooms = new Map<string, RoomState>();
@@ -24,11 +31,20 @@ const rooms = new Map<string, RoomState>();
 const getRoom = (roomId: string): RoomState => {
   let room = rooms.get(roomId);
   if (!room) {
-    room = { docs: new Map() };
+    room = {
+      docs: new Map(),
+      timer: { startedAt: Date.now(), accumulated: 0, running: true },
+    };
     rooms.set(roomId, room);
   }
   return room;
 };
+
+// Include the server clock so clients can correct for their own clock skew.
+const timerPayload = (room: RoomState) => ({
+  ...room.timer,
+  serverNow: Date.now(),
+});
 
 const getDoc = (roomId: string, docKey: string): Y.Doc => {
   const room = getRoom(roomId);
@@ -85,6 +101,31 @@ export const registerRoomNamespace = (io: Server): void => {
     socket.to(roomId).emit('room:peer-joined', {
       id: socket.id,
       name: displayName,
+    });
+
+    // --- Shared session timer (server-authoritative) ---
+    const room = getRoom(roomId);
+    socket.emit('room:timer', timerPayload(room));
+
+    socket.on('timer:toggle', () => {
+      const t = getRoom(roomId).timer;
+      if (t.running) {
+        t.accumulated += (Date.now() - t.startedAt) / 1000;
+        t.running = false;
+      } else {
+        t.startedAt = Date.now();
+        t.running = true;
+      }
+      nsp.to(roomId).emit('room:timer', timerPayload(getRoom(roomId)));
+    });
+
+    socket.on('timer:reset', () => {
+      getRoom(roomId).timer = {
+        startedAt: Date.now(),
+        accumulated: 0,
+        running: true,
+      };
+      nsp.to(roomId).emit('room:timer', timerPayload(getRoom(roomId)));
     });
 
     // --- Yjs docs (code, whiteboard, ...) ---
