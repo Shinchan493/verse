@@ -5,7 +5,10 @@ import {
   XIcon,
   BeakerIcon,
   TerminalIcon,
+  BookOpenIcon,
+  ExternalLinkIcon,
 } from '@heroicons/react/outline';
+import { ProblemData } from '../../services/leetcode-service';
 
 type Theme = 'dark' | 'light';
 
@@ -34,7 +37,7 @@ export interface RunOutput {
   error?: string;
 }
 
-export type ConsoleTab = 'output' | 'tests';
+export type ConsoleTab = 'output' | 'tests' | 'problem';
 
 interface CodeConsoleProps {
   theme: Theme;
@@ -46,12 +49,19 @@ interface CodeConsoleProps {
   testResults: Record<string, TestResult>;
   testsRunning: boolean;
   runnable: boolean;
+  problem: ProblemData | null;
   onRunTests: () => void;
   onAddTest: () => void;
   onUpdateTest: (index: number, patch: Partial<TestCase>) => void;
   onRemoveTest: (index: number) => void;
   onClose: () => void;
 }
+
+const DIFFICULTY_CLS: Record<string, string> = {
+  Easy: 'bg-emerald-500/15 text-emerald-500',
+  Medium: 'bg-amber-500/15 text-amber-500',
+  Hard: 'bg-red-500/15 text-red-500',
+};
 
 const STATUS_BADGE: Record<TestStatus, { label: string; cls: string }> = {
   running: { label: 'Running…', cls: 'bg-gray-500/15 text-gray-400' },
@@ -76,6 +86,7 @@ const CodeConsole = ({
   testResults,
   testsRunning,
   runnable,
+  problem,
   onRunTests,
   onAddTest,
   onUpdateTest,
@@ -136,9 +147,12 @@ const CodeConsole = ({
       >
         {(
           [
+            ...(problem
+              ? ([{ key: 'problem', label: 'Problem', Icon: BookOpenIcon }] as const)
+              : []),
             { key: 'output', label: 'Output', Icon: TerminalIcon },
             { key: 'tests', label: `Tests (${tests.length})`, Icon: BeakerIcon },
-          ] as const
+          ] as { key: ConsoleTab; label: string; Icon: typeof TerminalIcon }[]
         ).map(({ key, label, Icon }) => (
           <button
             key={key}
@@ -175,7 +189,46 @@ const CodeConsole = ({
 
       {/* Content */}
       <div className="flex-1 overflow-y-auto px-4 py-3">
-        {tab === 'output' ? (
+        {tab === 'problem' && problem ? (
+          <div>
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <a
+                href={problem.url}
+                target="_blank"
+                rel="noreferrer"
+                title="Open on LeetCode"
+                className={`flex items-center gap-1.5 text-sm font-semibold hover:text-accent ${t.text}`}
+              >
+                {problem.title}
+                <ExternalLinkIcon className="w-3.5 h-3.5 opacity-60" />
+              </a>
+              <span
+                className={`text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 ${
+                  DIFFICULTY_CLS[problem.difficulty] ??
+                  'bg-gray-500/15 text-gray-400'
+                }`}
+              >
+                {problem.difficulty}
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5 flex-wrap mb-2">
+              {problem.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className={`text-[10px] border rounded-full px-2 py-0.5 ${t.card} ${t.subtle}`}
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+            <div
+              className={`lc-problem ${
+                dark ? 'lc-problem-dark text-white/80' : 'lc-problem-light text-ink'
+              }`}
+              dangerouslySetInnerHTML={{ __html: problem.contentHTML }}
+            />
+          </div>
+        ) : tab === 'output' ? (
           running ? (
             <div className={`flex items-center gap-2 text-xs ${t.subtle}`}>
               <Spinner /> Running…

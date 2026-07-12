@@ -38,7 +38,9 @@ const useAuth = () => {
     email,
     setEmail,
   } = useContext(AuthContext);
-  const [refreshToken, setRefreshToken] = useLocalStorage<string | null>(
+  // Only the setter is used here — reads go through readStoredRefreshToken()
+  // so scheduled refreshes always see the current token, never a stale one.
+  const [, setRefreshToken] = useLocalStorage<string | null>(
     'refreshToken',
     null
   );
