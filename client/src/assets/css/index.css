@@ -157,3 +157,61 @@ input:focus {
   border: 1px solid #f2ece1;
   box-shadow: 0 8px 24px -8px rgba(26, 26, 26, 0.2);
 }
+
+/* --- Imported LeetCode problem statement (live session console) --- */
+.lc-problem {
+  font-size: 0.8rem;
+  line-height: 1.55;
+}
+.lc-problem p {
+  margin: 0.5rem 0;
+}
+.lc-problem pre {
+  margin: 0.5rem 0;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+}
+.lc-problem code {
+  font-family: 'JetBrains Mono', ui-monospace, monospace;
+  font-size: 0.72rem;
+  padding: 0.05rem 0.3rem;
+  border-radius: 4px;
+}
+.lc-problem pre code {
+  padding: 0;
+  border-radius: 0;
+}
+.lc-problem ul,
+.lc-problem ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.lc-problem ol {
+  list-style: decimal;
+}
+.lc-problem li {
+  margin: 0.15rem 0;
+}
+.lc-problem strong {
+  font-weight: 600;
+}
+.lc-problem img {
+  max-width: 100%;
+  border-radius: 8px;
+  margin: 0.5rem 0;
+}
+.lc-problem-light pre,
+.lc-problem-light code {
+  background: #f2ece1;
+  color: #1a1a1a;
+}
+.lc-problem-dark pre,
+.lc-problem-dark code {
+  background: rgba(255, 255, 255, 0.06);
+  color: rgba(255, 255, 255, 0.85);
+}

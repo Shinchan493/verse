@@ -4,6 +4,7 @@ import user from './user.route';
 import auth from './auth.route';
 import document from './document.route';
 import code from './code.route';
+import leetcode from './leetcode.route';
 import RoleEnum from '../types/enums/role-enum';
 
 const router = Router();
@@ -27,5 +28,6 @@ router.use('/user', user);
 router.use('/auth', auth);
 router.use('/document', document);
 router.use('/code', code);
+router.use('/leetcode', leetcode);
 
 export default router;

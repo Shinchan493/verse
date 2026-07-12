@@ -13,10 +13,11 @@ import { html } from '@codemirror/lang-html';
 import { css } from '@codemirror/lang-css';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { yCollab } from 'y-codemirror.next';
-import { PlayIcon, TerminalIcon } from '@heroicons/react/outline';
+import { PlayIcon, TerminalIcon, DownloadIcon } from '@heroicons/react/outline';
 import { bindYDocToRoom, colorForName } from './room-yjs';
 import useAuth from '../../hooks/use-auth';
 import CodeService from '../../services/code-service';
+import LeetcodeService, { ProblemData } from '../../services/leetcode-service';
 import CodeConsole, {
   ConsoleTab,
   RunOutput,
@@ -48,7 +49,7 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 
 const errorMessage = (err: unknown): string =>
   (err as any)?.response?.data?.errors?.[0]?.msg ??
-  'Execution failed — try again.';
+  'Something went wrong — try again.';
 
 // Minimal starter snippets so a fresh room isn't a blank page.
 const TEMPLATES: Record<string, string> = {
@@ -165,7 +166,7 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
 
   // --- Code execution + shared test cases ---
   const ytestsRef = useRef<Y.Array<TestCase> | null>(null);
-  const ymetaRef = useRef<Y.Map<string> | null>(null);
+  const ymetaRef = useRef<Y.Map<any> | null>(null);
   const [panelOpen, setPanelOpen] = useState(false);
   const [tab, setTab] = useState<ConsoleTab>('output');
   const [running, setRunning] = useState(false);
@@ -176,6 +177,14 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     {}
   );
   const runnable = RUNNABLE.has(language);
+
+  // --- Imported LeetCode problem (shared with the room via the meta map) ---
+  const problemRef = useRef<ProblemData | null>(null);
+  const [problem, setProblem] = useState<ProblemData | null>(null);
+  const [importOpen, setImportOpen] = useState(false);
+  const [importValue, setImportValue] = useState('');
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
 
   // Content is still "just a starter" if it's empty or exactly matches one of
   // the known templates — only then may a language switch replace it. Real
@@ -229,16 +238,24 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     // The room's language selection is shared too (same doc, separate key) —
     // when a peer switches language, everyone's editor follows. The content
     // swap itself arrives through the code doc from whoever switched.
-    const ymeta = testsDoc.getMap<string>('meta');
+    const ymeta = testsDoc.getMap<any>('meta');
     ymetaRef.current = ymeta;
     const onMetaChange = () => {
-      const lang = ymeta.get('language');
+      const lang = ymeta.get('language') as string | undefined;
       if (lang && LANGUAGES[lang] && lang !== langRef.current) {
         setLanguage(lang);
         langRef.current = lang;
         viewRef.current?.dispatch({
           effects: langCompartmentRef.current.reconfigure(LANGUAGES[lang]()),
         });
+      }
+      // An imported problem is shared room-wide: show it to everyone.
+      const p = ymeta.get('problem') as ProblemData | undefined;
+      if (p && p.slug !== problemRef.current?.slug) {
+        problemRef.current = p;
+        setProblem(p);
+        setPanelOpen(true);
+        setTab('problem');
       }
     };
     ymeta.observe(onMetaChange);
@@ -401,6 +418,75 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
     socket.emit('code:result', { kind: 'tests', results: Object.values(results) });
   };
 
+  // --- LeetCode problem import ---
+
+  const importProblem = async () => {
+    const value = importValue.trim();
+    if (!value || importing || !accessToken) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      const res = await LeetcodeService.get(accessToken, value);
+      const p = res.data;
+
+      // Keep the current language if the problem has a starter for it,
+      // otherwise fall back to the first common one that does.
+      const preference = [
+        langRef.current,
+        'JavaScript',
+        'Python',
+        'C / C++',
+        'TypeScript',
+      ];
+      const lang = preference.find((l) => p.snippets[l]) ?? langRef.current;
+      if (lang !== langRef.current) {
+        setLanguage(lang);
+        langRef.current = lang;
+        viewRef.current?.dispatch({
+          effects: langCompartmentRef.current.reconfigure(LANGUAGES[lang]()),
+        });
+        ymetaRef.current?.set('language', lang);
+      }
+
+      // Share the problem with the room (the meta observer opens the panel).
+      ymetaRef.current?.set('problem', p);
+
+      // Importing is explicit — the starter replaces the editor content.
+      const ytext = ytextRef.current;
+      const ydoc = ytext?.doc;
+      const snippet = p.snippets[lang];
+      if (ytext && ydoc && snippet) {
+        ydoc.transact(() => {
+          if (ytext.length > 0) ytext.delete(0, ytext.length);
+          ytext.insert(0, snippet);
+        }, 'template');
+      }
+
+      // The example cases replace the shared test list.
+      const ytests = ytestsRef.current;
+      if (ytests) {
+        ytests.doc?.transact(() => {
+          if (ytests.length > 0) ytests.delete(0, ytests.length);
+          ytests.insert(
+            0,
+            p.examples.map((ex) => ({
+              id: uid(),
+              input: ex.input,
+              expected: ex.expected,
+            }))
+          );
+        });
+      }
+      setTestResults({});
+      setOutput(null);
+      setImportOpen(false);
+      setImportValue('');
+    } catch (err) {
+      setImportError(errorMessage(err));
+    }
+    setImporting(false);
+  };
+
   // --- Shared test-case CRUD (mutate the Yjs array so peers stay in sync) ---
 
   const addTest = () =>
@@ -438,6 +524,84 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
           Code
         </span>
         <div className="flex items-center gap-2">
+          {/* Import a LeetCode problem */}
+          <div className="relative">
+            <button
+              onClick={() => {
+                setImportOpen((v) => !v);
+                setImportError(null);
+              }}
+              title="Import a LeetCode problem"
+              className={`flex items-center gap-1 text-xs font-medium border rounded-md px-2 py-1 transition-colors ${
+                dark
+                  ? 'bg-[#1c1c1f] text-white/70 border-white/10 hover:bg-white/10'
+                  : 'bg-white text-ink-soft border-paper-2 hover:bg-paper-2'
+              }`}
+            >
+              <DownloadIcon className="w-3.5 h-3.5" />
+              Import
+            </button>
+            {importOpen && (
+              <div
+                className={`absolute right-0 top-full mt-2 w-72 border rounded-xl shadow-2xl z-40 p-3 ${
+                  dark
+                    ? 'bg-[#1c1c1c] border-white/10 text-white'
+                    : 'bg-white border-paper-2 text-ink'
+                }`}
+              >
+                <p
+                  className={`text-xs mb-2 ${
+                    dark ? 'text-white/50' : 'text-ink-soft'
+                  }`}
+                >
+                  Paste a LeetCode problem URL or slug — the statement, starter
+                  code, and example test cases are shared with the room.
+                </p>
+                <input
+                  autoFocus
+                  value={importValue}
+                  onChange={(e) => setImportValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') importProblem();
+                    if (e.key === 'Escape') setImportOpen(false);
+                  }}
+                  placeholder="https://leetcode.com/problems/two-sum/"
+                  spellCheck={false}
+                  className={`w-full text-xs font-mono border rounded-md px-2 py-1.5 focus:outline-none focus:border-accent ${
+                    dark
+                      ? 'bg-[#131316] text-white/80 border-white/10 placeholder-white/25'
+                      : 'bg-white text-ink border-paper-2 placeholder-ink-faint/60'
+                  }`}
+                />
+                {importError && (
+                  <p className="text-[11px] text-red-500 mt-1.5">{importError}</p>
+                )}
+                <div className="flex items-center justify-end gap-2 mt-2.5">
+                  <button
+                    onClick={() => setImportOpen(false)}
+                    className={`text-xs px-2 py-1 rounded-md transition-colors ${
+                      dark
+                        ? 'text-white/60 hover:bg-white/10'
+                        : 'text-ink-soft hover:bg-paper-2'
+                    }`}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={importProblem}
+                    disabled={importing || !importValue.trim()}
+                    className="flex items-center gap-1.5 text-xs font-semibold text-white bg-accent hover:bg-accent-hover disabled:opacity-40 disabled:cursor-not-allowed rounded-md px-2.5 py-1 transition-colors"
+                  >
+                    {importing && (
+                      <span className="w-3 h-3 inline-block rounded-full border-2 border-current border-t-transparent animate-spin" />
+                    )}
+                    Import
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
           <select
             value={language}
             onChange={(e) => handleLanguageChange(e.target.value)}
@@ -495,6 +659,7 @@ const CollabCodeEditor = ({ socket, me, theme }: CollabCodeEditorProps) => {
           testResults={testResults}
           testsRunning={testsRunning}
           runnable={runnable}
+          problem={problem}
           onRunTests={runTests}
           onAddTest={addTest}
           onUpdateTest={updateTest}
